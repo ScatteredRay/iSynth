@@ -105,3 +105,9 @@ void setupSound()
     //verify(!err);
 
 }
+
+void makeNoise()
+{ 
+  setupSound();
+  streamSound();
+}
