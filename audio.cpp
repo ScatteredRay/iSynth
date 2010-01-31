@@ -1,7 +1,3 @@
-#include <dsound.h>
-#include <windows.h>
-#include <winerror.h>
-#include <dxerr.h>
 #include <cstdio>
 #include <cmath>
 #include <vector>
@@ -257,7 +253,7 @@ void produceStream(short *buffer, int samples)
   {
     const float *o = output.output();
     *buffer++ = short(o[i] * 32767);
-    *buffer++ = short(o[i] * 32767);
+    //*buffer++ = short(o[i] * 32767);
   }
   
 /*  static float oscillator = -pi;
@@ -274,8 +270,11 @@ void produceStream(short *buffer, int samples)
   }*/
 }
 
-void makeNoise(unsigned int buffer_size)
+void setupSound();
+void streamSound();
+
+void makeNoise()
 { 
-  setupSound (buffer_size);
-  streamSound(buffer_size);
+  setupSound();
+  streamSound();
 }

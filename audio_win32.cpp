@@ -1,7 +1,14 @@
+#include <dsound.h>
+#include <windows.h>
+#include <winerror.h>
+#include <dxerr.h>
+
 IDirectSoundBuffer *buffer;
 HANDLE notification_event;
 
-void setupSound(unsigned int buffer_size)
+unsigned int buffer_size = 2000
+
+void setupSound()
 {
   IDirectSound8 *dsound;
   if(FAILED(DirectSoundCreate8(0, &dsound, 0)))
@@ -68,7 +75,7 @@ void setupSound(unsigned int buffer_size)
     throw "couldn't play dsound buffer";
 }
 
-void streamSound(unsigned int buffer_size)
+void streamSound()
 {
   unsigned int next_write_position = 0;
   
