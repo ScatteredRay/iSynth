@@ -211,70 +211,50 @@ class Constant : public Module
 
 void produceStream(short *buffer, int samples)
 {
-  static Constant lfo_frequency(4);
-  static Constant lfo_amplitude(10);
-  static Constant lfo_offset(500);
-  static Constant lfo_offset2(500*1.5);
-  static Constant unit(.25);
-  static Sine lfo(lfo_frequency.output(), lfo_amplitude.output());
-  static Mixer lfo_final;
-  static Mixer lfo2_final;
-  static Triangle triangle(lfo_final.output(), unit.output());
-  static Triangle triangle2(lfo2_final.output(), unit.output());
-  static Mixer triangle_mix;
-  static Overdrive output(triangle_mix.output());
+  static Constant freq_lfo_frequency(4);
+  static Constant freq_lfo_amplitude(10);
+  static Constant osc1_base_frequency(200);
+  static Constant osc2_base_frequency(200*1.5);
+  static Constant osc_amplitude(.25);
+  static Sine freq_lfo(freq_lfo_frequency.output(), freq_lfo_amplitude.output());
+  static Mixer osc1_frequency;
+  static Mixer osc2_frequency;
+  static Triangle osc1(osc1_frequency.output(), osc_amplitude.output());
+  static Triangle osc2(osc2_frequency.output(), osc_amplitude.output());
+  static Mixer osc_mix;
+  static Overdrive output(osc_mix.output(), 3.0, 0.5, 3.0);
   
-  static bool setup = false;
-  if(!setup)
+  static bool first = true;
+  if(first)
   {
-    lfo_final.addInput(lfo.output());
-    lfo_final.addInput(lfo_offset.output());
-    lfo2_final.addInput(lfo.output());
-    lfo2_final.addInput(lfo_offset2.output());
-    triangle_mix.addInput(triangle.output());
-    triangle_mix.addInput(triangle2.output());    
-    setup = true;
+    osc1_frequency.addInput(osc1_base_frequency.output());
+    osc1_frequency.addInput(freq_lfo.output());
+    osc2_frequency.addInput(osc2_base_frequency.output());
+    osc2_frequency.addInput(freq_lfo.output());
+    osc_mix.addInput(osc1.output());
+    osc_mix.addInput(osc2.output());    
+
+    freq_lfo_frequency.fill(samples);
+    freq_lfo_amplitude.fill(samples);
+    osc1_base_frequency.fill(samples);
+    osc2_base_frequency.fill(samples);
+    osc_amplitude.fill(samples);
+
+    first = false;
   }
   
-  lfo_frequency.fill(samples);
-  lfo_amplitude.fill(samples);
-  lfo_offset.fill(samples);
-  lfo_offset2.fill(samples);
-  unit.fill(samples);
-  lfo.fill(samples);
-  lfo_final.fill(samples);
-  lfo2_final.fill(samples);
-  triangle.fill(samples);
-  triangle2.fill(samples);
-  triangle_mix.fill(samples);
+  freq_lfo.fill(samples);
+  osc1_frequency.fill(samples);
+  osc2_frequency.fill(samples);
+  osc1.fill(samples);
+  osc2.fill(samples);
+  osc_mix.fill(samples);
   output.fill(samples);
   
   for(int i=0; i<samples; i++)
   {
     const float *o = output.output();
     *buffer++ = short(o[i] * 32767);
-    //*buffer++ = short(o[i] * 32767);
+    *buffer++ = short(o[i] * 32767);
   }
-  
-/*  static float oscillator = -pi;
-  static float pitch = 500;
-  for(int i=0; i<samples; i++)
-  {
-    short sample = short(sin(oscillator) * 32767);
-    *buffer++ = sample;
-    *buffer++ = sample;
-    oscillator += pitch / 44100;
-    while(oscillator > pi) oscillator -= 2*pi;
-    pitch += 0.5f;
-    while(pitch >= 10000) pitch -= 9000;    
-  }*/
-}
-
-void setupSound();
-void streamSound();
-
-void makeNoise()
-{ 
-  setupSound();
-  streamSound();
 }

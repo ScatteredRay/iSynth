@@ -183,6 +183,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\audio.h"
+				>
+			</File>
+			<File
 				RelativePath=".\audio_win32.cpp"
 				>
 			</File>
@@ -196,10 +200,6 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
-			<File
-				RelativePath=".\audio.h"
-				>
-			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"
