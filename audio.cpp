@@ -1,3 +1,23 @@
+/* multiplex modules: must take at least one vectors of buffers in, maintains
+   multiple channels for output, but can mixdown if a mono module requests.
+   
+   should be a way to create and destroy channels.  presumably create on
+   note-on, how do we know when to destroy?  some way to flag, like when the
+   envgen goes idle?  note-off and n samples of silence?  should be after the
+   reverb trails off.  can't check for that, though, because we're not
+   reverbing each channel individually.
+   
+   stereo: ulch, for now just let the convolution be a special case at the end.
+   maybe we can make mono/stereo modules work similarly, where stereo modules
+   maintain both channels but can mixdown if a mono module requests -- but it
+   really should work the opposite way, whereas multiplex modules are a way
+   to take poly input and produce a single output, stereo is a way to take a
+   single input and produce two outputs.
+   
+   okay, okay, hear me out on this one: a stereo module can *convert to
+   stereo* if given mono input.  huh?  huh?  i like it.
+*/
+
 #include <cstdio>
 #include <cmath>
 #include <vector>
@@ -392,29 +412,34 @@ class Constant : public Module
 void produceStream(short *buffer, int samples)
 {
   static Constant freq_lfo_frequency(5);
-  static Constant osc1_base_frequency(110);
-  static Constant osc2_base_frequency(110*1.01f);
-  static Constant filter_cutoff(1250);
-  static Constant filter_resonance(0.9f);
-  static Constant cutoff_lfo_frequency(0.5f);
-  static Constant gate_frequency(5.0f);
-  static Constant gate_pulsewidth(0.8f);
-  static Pulse gate_unit(gate_frequency, gate_pulsewidth);
-  static UnitScaler gate(gate_unit, 0, 1);
-  static EnvelopeGenerator env(gate, 0.001f, 0.5f, 0.25f, 0.1f);
   static Sine freq_lfo_unit(freq_lfo_frequency);
   static UnitScaler freq_lfo(freq_lfo_unit, -3, 3);
-  static Sine cutoff_lfo_unit(cutoff_lfo_frequency);
-  static UnitScaler cutoff_lfo(cutoff_lfo_unit, 0, 400);
-  static UnitScaler cutoff_env(env, 500, 1500); 
-  static Add cutoff(cutoff_lfo, cutoff_env); 
+
+  static Constant osc1_base_frequency(55);
+  static Constant osc2_base_frequency(55*1.01f);
   static Add osc1_frequency(osc1_base_frequency, freq_lfo);
   static Add osc2_frequency(osc2_base_frequency, freq_lfo);
+
+  static Constant gate_frequency(6.0f);
+  static Constant gate_pulsewidth(0.2f);
+  static Pulse gate_unit(gate_frequency, gate_pulsewidth);
+  static UnitScaler gate(gate_unit, 0, 1);
+  static EnvelopeGenerator env(gate, 0.01f, 0.5f, 0.25f, 0.03f);
+
   static Saw osc1(osc1_frequency);
   static Saw osc2(osc2_frequency);
   static Add osc_mix(osc1, osc2);
-  static Overdrive overdrive(osc_mix, 10);
+
+  static Overdrive overdrive(osc_mix, 1);
+
+  static Constant cutoff_lfo_frequency(0.2f);
+  static UnitScaler cutoff_env(env, 250, 750); 
+  static Sine cutoff_lfo_unit(cutoff_lfo_frequency);
+  static UnitScaler cutoff_lfo(cutoff_lfo_unit, 0, 600);
+  static Add cutoff(cutoff_lfo, cutoff_env); 
+  static Constant filter_resonance(0.9f);
   static Filter filter(overdrive, cutoff, filter_resonance);
+
   static Multiply output(filter, env);
   
   static float time = 0;  

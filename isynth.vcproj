@@ -2,7 +2,7 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9.00"
-	Name="rock guitar"
+	Name="isynth"
 	ProjectGUID="{637BA34B-3C89-4760-9C67-5BB1BD7108BD}"
 	RootNamespace="rockguitar"
 	Keyword="Win32Proj"
