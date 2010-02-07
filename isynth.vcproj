@@ -118,6 +118,10 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				Optimization="3"
+				InlineFunctionExpansion="2"
+				EnableIntrinsicFunctions="true"
+				FavorSizeOrSpeed="1"
 				AdditionalIncludeDirectories="&quot;C:\Program Files (x86)\Microsoft DirectX SDK (August 2009)\Include&quot;;&quot;D:\Program Files\Microsoft DirectX SDK (February 2007)\Include&quot;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
