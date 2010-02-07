@@ -1,43 +1,73 @@
+/* multiplex modules: must take at least one vectors of buffers in, maintains
+   multiple channels for output, but can mixdown if a mono module requests.
+   
+   should be a way to create and destroy channels.  presumably create on
+   note-on, how do we know when to destroy?  some way to flag, like when the
+   envgen goes idle?  note-off and n samples of silence?  should be after the
+   reverb trails off.  can't check for that, though, because we're not
+   reverbing each channel individually.
+   
+   stereo: ulch, for now just let the convolution be a special case at the end.
+   maybe we can make mono/stereo modules work similarly, where stereo modules
+   maintain both channels but can mixdown if a mono module requests -- but it
+   really should work the opposite way, whereas multiplex modules are a way
+   to take poly input and produce a single output, stereo is a way to take a
+   single input and produce two outputs.
+   
+   okay, okay, hear me out on this one: a stereo module can *convert to
+   stereo* if given mono input.  huh?  huh?  i like it.
+*/
+
 #include <cstdio>
 #include <cmath>
 #include <vector>
 
-const float pi = 3.1415926535897932384626f;
+#define _CRT_SECURE_NO_WARNINGS
+#pragma warning(disable : 4244)
+#pragma warning(disable : 4305)
+
+const float pi = 3.1415926535897932384626f, e = 2.71828183f;
+const float note_0 = 8.1757989156;
 const int max_buffer_size = 4000;
 const int sample_rate = 44100;
+
+#define IMPULSE_PATH "impulses/"
 
 class Module
 {
   public:
     Module()
     {
-      for(int i=0; i<max_buffer_size; i++) m_output[i] = 0;      
+      for(int i=0; i<max_buffer_size; i++) m_output[i] = 0;
+      m_latest_fill = 0;
     }
+        
+    virtual void fill(float latest_fill, int samples) = 0;
     
-    virtual void fill(int samples) = 0;
-    
-    const float *output() const { return m_output; }
+    const float *output(float latest_fill, int samples)
+    {
+      if(m_latest_fill < latest_fill)
+      {
+        fill(latest_fill, samples);
+        m_latest_fill = latest_fill;
+      }
+      return m_output;
+    }
   
-  protected:
+  protected:  
     float m_output[max_buffer_size];
+    float m_latest_fill;
 };
 
 class Oscillator : public Module
 {
   public:
-    Oscillator(const float *frequency, const float *amplitude)
-    : Module(), m_position(0),
-      m_frequency_input_buffer(frequency),
-      m_amplitude_input_buffer(amplitude)
-    {
-    }
-  
-    void setFrequency(const float *f) { m_frequency_input_buffer = f; }
-    void setAmplitude(const float *a) { m_amplitude_input_buffer = a; }
+    Oscillator(Module &frequency)
+    : Module(), m_position(0), m_frequency(frequency)
+    {}
     
   protected:
-    const float *m_frequency_input_buffer;
-    const float *m_amplitude_input_buffer;
+    Module &m_frequency;
   
     float m_position;
 };
@@ -45,163 +75,452 @@ class Oscillator : public Module
 class Saw : public Oscillator
 {
   public:
-    Saw(const float *frequency, const float *amplitude)
-    : Oscillator(frequency, amplitude)
-    {}
+    Saw(Module &frequency) : Oscillator(frequency) {}
     
-    void fill(int samples)
+    void fill(float latest_fill, int samples)
     {
+      const float *frequency = m_frequency.output(latest_fill, samples);
+      
       for(int i=0; i<samples; i++)
       {
-        m_output[i] = (m_position-0.5f)*2 * m_amplitude_input_buffer[i];
+        
+        m_output[i] = (m_position-0.5f)*2;
       
-        m_position += m_frequency_input_buffer[i] / 44100;
+        m_position += frequency[i] / sample_rate;
         m_position -= int(m_position);
       }
     }
+};
+
+class Pulse : public Oscillator
+{
+  public:
+    Pulse(Module &frequency, Module &pulsewidth)
+    : Oscillator(frequency), m_pulsewidth(pulsewidth)
+    {}
+    
+    void fill(float latest_fill, int samples)
+    {
+      const float *frequency  = m_frequency .output(latest_fill, samples);
+      const float *pulsewidth = m_pulsewidth.output(latest_fill, samples);
+      
+      for(int i=0; i<samples; i++)
+      {
+        m_output[i] = (m_position > pulsewidth[i]) ? -1.0f:1.0f;      
+        m_position += frequency[i] / sample_rate;
+        m_position -= int(m_position);
+      }
+    }
+
+  protected:
+    Module &m_pulsewidth;
 };
 
 class Sine : public Oscillator
 {
   public:
-    Sine(const float *frequency, const float *amplitude)
-    : Oscillator(frequency, amplitude)
-    {}
+    Sine(Module &frequency) : Oscillator(frequency) {}
 
-    void fill(int samples)
+    void fill(float latest_fill, int samples)
     {
+      const float *frequency  = m_frequency.output(latest_fill, samples);
+
       for(int i=0; i<samples; i++)
       {
-        m_output[i] = sin(m_position*2*pi) * m_amplitude_input_buffer[i];
+        m_output[i] = sin(m_position*2*pi);
       
-        m_position += m_frequency_input_buffer[i] / 44100;
+        m_position += frequency[i] / sample_rate;
         m_position -= int(m_position);
       }
     }
 };
 
-class Mixer : public Module
+class Triangle : public Oscillator
 {
   public:
-    void addInput(const float *input)
+    Triangle(Module &frequency) : Oscillator(frequency)
+    {}
+
+    void fill(float latest_fill, int samples)
     {
-      m_inputs.push_back(input);
+      const float *frequency  = m_frequency.output(latest_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        if(m_position < .5f) m_output[i] = (m_position-0.25f) *  4;
+        else                 m_output[i] = (m_position-0.75f) * -4;
+      
+        m_position += frequency[i] / sample_rate;
+        m_position -= int(m_position);
+      }
+    }
+};
+
+class Noise : public Module
+{
+  public:
+    Noise() {}
+    
+    void fill(float latest_fill, int samples)
+    {
+      for(int i=0; i<samples; i++)
+        m_output[i] = 2.0f*rand()/RAND_MAX - 1.0;
+    }
+};
+
+class SampleAndHold : public Module
+{
+  public:
+    SampleAndHold(Module &source, Module &trigger)
+    : m_source(source), m_trigger(trigger), m_value(0), m_waiting(true)
+    {}
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *source  = m_source .output(last_fill, samples);
+      const float *trigger = m_trigger.output(last_fill, samples);
+      
+      for(int i=0; i<samples; i++)
+      {
+        if(!m_waiting)
+        {
+          if(trigger[i] < 0.1) m_waiting = true;
+        }
+        else
+        {
+          if(trigger[i] > 0.9)
+          {
+            m_waiting = false;
+            m_value = source[i];
+          }
+        }
+        m_output[i] = m_value;
+      }
     }
     
-    void fill(int samples)
+  private:
+    Module &m_source, &m_trigger;
+    float m_value;
+    bool m_waiting;
+};
+
+class Quantize : public Module
+{
+  public: 
+    Quantize(Module &input) : m_input(input) {}
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *input = m_input.output(last_fill, samples);
+      for(int i=0; i<samples; i++)
+        m_output[i] = floor(input[i]+0.5);
+    }
+  
+  private:
+    Module &m_input;
+};
+
+class NoteToFrequency : public Module
+{
+  public:
+    NoteToFrequency(Module &input) : m_input(input) {}
+        
+    void fill(float last_fill, int samples)
+    {
+      const float *input = m_input.output(last_fill, samples);
+      for(int i=0; i<samples; i++)
+        m_output[i] = pow(2, input[i]/12) * note_0;
+    }
+    
+  private:
+    Module &m_input;
+};
+
+class Add : public Module
+{
+  public:
+    Add() {}
+    Add(Module &a, Module &b)
+    {
+      addInput(a);
+      addInput(b);
+    }
+   
+    void addInput(Module &input) { m_inputs.push_back(&input); }
+    
+    void fill(float latest_fill, int samples)
     {
       if(m_inputs.size() == 0) return;
       
-      memcpy(m_output, m_inputs[0], samples * sizeof(float));
+      memcpy(m_output, m_inputs[0]->output(latest_fill, samples), samples * sizeof(float));
       for(unsigned int i=1; i<m_inputs.size(); i++)
       {
-        const float *input = m_inputs[i];      
+        const float *input = m_inputs[i]->output(latest_fill, samples);
         for(int j=0; j<samples; j++)
           m_output[j] += input[j];
       }
     }
     
   private:
-    std::vector<const float *> m_inputs;
+    std::vector<Module *> m_inputs;
 };
 
-class Triangle : public Oscillator
+class Filter : public Module
 {
   public:
-    Triangle(const float *frequency, const float *amplitude)
-    : Oscillator(frequency, amplitude)
-    {}
-
-    void fill(int samples)
+    Filter(Module &input, Module &cutoff, Module &resonance)
+    : m_input(input), m_cutoff(cutoff), m_resonance(resonance),
+      m_oldcutoff(-1), m_oldresonance(-1)
     {
+      m_y1=m_y2=m_y3=m_y4=m_oldx=m_oldy1=m_oldy2=m_oldy3 = 0;
+    }
+    
+    inline void recalculateFilter(float cutoff, float resonance)
+    {
+      m_f = 2.0f * cutoff / sample_rate;
+      m_k = 3.6f*m_f - 1.6f*m_f*m_f -1.0f;
+      m_p = (m_k+1.0f)*0.5f;
+      m_scale = pow(e, (1.0f-m_p)*1.386249f);
+      m_r = resonance * m_scale;      
+    }
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *input     = m_input    .output(last_fill, samples);
+      const float *cutoff    = m_cutoff   .output(last_fill, samples);
+      const float *resonance = m_resonance.output(last_fill, samples);
+
       for(int i=0; i<samples; i++)
       {
-        float value;
-        if(m_position < .5f) value = (m_position-0.25f) *  4;
-        else                 value = (m_position-0.75f) * -4;
+        if(m_oldcutoff != cutoff[i] || m_oldresonance != resonance[i])
+          recalculateFilter(cutoff[i], resonance[i]);
+          
+        float x = input[i] - m_r*m_y4;
+
+        //Four cascaded onepole filters (bilinear transform)
+        m_y1 =    x*m_p + m_oldx *m_p - m_k*m_y1;
+        m_y2 = m_y1*m_p + m_oldy1*m_p - m_k*m_y2;
+        m_y3 = m_y2*m_p + m_oldy2*m_p - m_k*m_y3;
+        m_y4 = m_y3*m_p + m_oldy3*m_p - m_k*m_y4;
+
+        //Clipper band limited sigmoid
+        m_y4 -= pow(m_y4, 3)/6;
+
+        m_oldx  = x;
+        m_oldy1 = m_y1;
+        m_oldy2 = m_y2;
+        m_oldy3 = m_y3;
         
-        m_output[i] = value * m_amplitude_input_buffer[i];
-      
-        m_position += m_frequency_input_buffer[i] / 44100;
-        m_position -= int(m_position);
+        m_output[i] = m_y4;
       }
     }
+
+  private:
+    Module &m_input, &m_cutoff, &m_resonance;
+    float m_oldcutoff, m_oldresonance;
+    float m_f, m_k, m_p, m_scale, m_r;
+    float m_y1, m_y2, m_y3, m_y4, m_oldx, m_oldy1, m_oldy2, m_oldy3;
 };
 
 class Overdrive : public Module
 {
   public:
-    Overdrive(const float *input, float preamp = 3.0f,
-              float threshold = 0.75f, float intensity = 2.0f)
-    : Module(), m_input(input), m_preamp(preamp), m_threshold(threshold),
-      m_intensity(intensity), m_value(0)
+    Overdrive(Module &input, float amount = 2.0f)
+    : m_input(input), m_amount(1.0f - 1.0f/amount)
     {}
     
-    void fill(int samples)
+    void fill(float last_fill, int samples)
     {
+      const float *input = m_input.output(last_fill, samples);
+      
       for(int i=0; i<samples; i++)
       {
-        float sample = m_input[i] * m_preamp;
-        //m_output[i] = sample;
-        //continue;
-        
-        if(sample > 0) m_value =  1.0 - 1.0/(sample+1.0);
-        else           m_value = -1.0 - 1.0/(sample+1.0);
-        
-        if(sample < m_threshold && sample > -m_threshold) m_value = sample;
-        else
-        {
-          if(sample > 0) m_value =  m_threshold;
-          else           m_value = -m_threshold;
-          /*
-          float filter = 1.0 / ((fabs(sample) - m_threshold) * m_intensity); 
-          m_value = m_value * filter + sample * (1.0f - filter);
-          
-          if(m_value >  1.0f) m_value =  1.0f;
-          if(m_value < -1.0f) m_value = -1.0f;*/
+        float x = input[i];
+        float k = 2*m_amount/(1-m_amount);
+        m_output[i] = (1+k)*x/(1+k*abs(x));
+      }
+    }
+  
+  private:
+    Module &m_input;
+    
+    float m_amount;
+};
+
+class Multiply : public Module
+{
+  public:
+    Multiply(Module &a, Module &b) : m_a(a), m_b(b) {}
+    
+    void fill(float last_fill, int samples)
+    {      
+      const float *a = m_a.output(last_fill, samples);
+      const float *b = m_b.output(last_fill, samples);
+      for(int i=0; i<samples; i++) m_output[i] = a[i]*b[i];
+    }
+
+  private:
+    Module &m_a, &m_b;
+};
+
+class EnvelopeGenerator : public Module
+{
+  public:
+    EnvelopeGenerator(Module &gate, float attack, float decay,
+                      float sustain, float release)
+    : m_gate(gate), m_attack(attack), m_decay(decay), m_sustain(sustain),
+      m_release(release), m_position(0), m_rate(0), m_held(false), m_stage(IDLE)
+    { 
+    }
+    
+    enum { IDLE, ATTACK, DECAY, SUSTAIN, RELEASE };
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *gate = m_gate.output(last_fill, samples);
+      
+      for(int i=0; i<samples; i++)
+      {
+        if(!m_held)
+        { 
+          if(gate[i] > 0.9)
+          {
+            m_stage = ATTACK;
+            m_rate = (1-m_position) / (sample_rate*m_attack);
+            m_held = true;
+          }
         }
-        m_output[i] = m_value;
+        else
+        { 
+          if(gate[i] < 0.1)
+          {
+            m_stage = RELEASE;
+            m_rate = -m_position / (sample_rate*m_release);
+            m_held = false;
+          }
+        }
+
+        m_position += m_rate;
+        
+        switch(m_stage)
+        {
+          case IDLE: case SUSTAIN: break;
+          case ATTACK:
+            if(m_position >= 1)          
+            {
+              m_stage = DECAY;
+              m_position = 1;
+              m_rate = (m_sustain-1) / (sample_rate*m_decay);
+            }
+            break;
+          case DECAY:
+            if(m_position <= m_sustain)
+            {
+              m_stage = SUSTAIN;
+              m_position = m_sustain;
+              m_rate = 0;
+            }
+            break;
+          case RELEASE:
+            if(m_position <= 0.0)
+            {
+              m_stage = IDLE;
+              m_position = 0.0;
+              m_rate = 0.0;
+            }
+            break;
+        }
+                
+        m_output[i] = m_position; 
       }
     }
     
-    void setInput(const float *i) { m_input = i; }
-  
-  private:
-    const float *m_input;
+  private:   
+    float m_position, m_rate;
+    bool m_held;
+    int m_stage;    
     
-    float m_value;
-    
-    float m_preamp;
-    float m_threshold;
-    float m_intensity;
+    Module &m_gate;
+    float m_attack, m_decay, m_sustain, m_release;    
 };
 
+
+// maybe support sweeping the length too?  i bet that would sound awesome
+// speed parameter currently unimplemented
 class Delay : public Module
 {
-  public:
-    Delay(int max_length = 44100) : Module()
+  public: 
+    Delay(float length, float filter, Module &input, Module &wet,
+          Module &feedback, Module &speed)
+    : m_buffer(new float[int(length*sample_rate)]),
+      m_length(int(length*sample_rate)),
+      m_read_pos(1), m_write_pos(0), m_last_sample(0), m_filter(filter),
+      m_input(input), m_wet(wet), m_feedback(feedback), m_speed(speed)
     {
-      buffer = new float[max_length];
+      memset(m_buffer, 0, m_length*sizeof(float));
     }
     
     ~Delay()
     {
-      delete[] buffer;
+      delete[] m_buffer;
+    }
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *input    = m_input   .output(last_fill, samples);
+      const float *wet      = m_wet     .output(last_fill, samples);
+      const float *feedback = m_feedback.output(last_fill, samples);
+      const float *speed    = m_speed   .output(last_fill, samples);
+      
+      for(int i=0; i<samples; i++)
+      { 
+        float sample = m_buffer[int(floor(m_read_pos))]*m_filter + m_last_sample*(1-m_filter);
+        m_last_sample = sample;
+        m_output[i] = input[i] + sample * wet[i];
+        m_buffer[m_write_pos] = input[i] + sample * feedback[i];
+        
+        if(++m_write_pos >= m_length) m_write_pos -= m_length;
+        if(++m_read_pos  >= m_length) m_read_pos  -= m_length;
+      }
     }
   
   private:
-    float *buffer;
+    float *m_buffer;
+    int m_length;
+    float m_filter;
+    float m_read_pos;
+    float m_last_sample;
+    int m_write_pos;
+    
+    Module &m_input, &m_wet, &m_feedback, &m_speed;
+};
+
+class UnitScaler : public Module
+{
+  public:
+    UnitScaler(Module &input, float min, float max)
+    : m_input(input), m_range((max-min)/2)
+    { 
+      m_offset = min+m_range;
+    }
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *input = m_input.output(last_fill, samples);      
+      for(int i=0; i<samples; i++) m_output[i] = input[i]*m_range + m_offset;
+    }
+
+  private:
+    Module &m_input;
+    float m_range, m_offset;
 };
 
 class Constant : public Module
 {
   public:
-    Constant(float value) : Module()
-    {
-      setValue(value);
-    }
+    Constant(float value) : Module() { setValue(value); }
   
-    void fill(int samples) {}
+    void fill(float last_fill, int samples) {}
 
     void setValue(float value)
     {
@@ -209,51 +528,134 @@ class Constant : public Module
     }
 };
 
+/*
+class Sample
+{
+  public:
+    Sample(const char *filename)
+    {
+      // presuming 16 bit input
+      FILE *in = fopen(filename, "rb");
+      if(!in) throw "couldn't open file";
+      fseek(in, 0, SEEK_END);
+      m_length = ftell(in)/2;
+      m_data = new float[m_length];
+      fseek(in, 0, SEEK_SET);
+      for(int i=0; i<m_length; i++)
+      {
+        signed short s;
+        fread(&s, 1, 2, in);
+        m_data[i] = s/32768.0;
+      }
+    }
+    
+    const float *data() const { return m_data; }
+    int length() const { return m_length; }
+    
+    ~Sample()
+    {
+      delete[] m_data;
+    }
+
+  private:
+    float *m_data;
+    int m_length;
+};
+
+class Convolver : public Module
+{
+  public:
+    Convolver(Module &input, Sample &impulse, float wet)
+    : m_input(input), m_impulse(impulse), m_wet(wet), m_history_write_pos(0)
+    {
+      m_history = new float[impulse.length()];
+      memset(m_history, 0, impulse.length()*sizeof(float));
+    }
+    
+    ~Convolver()
+    {
+      delete[] m_history;
+    }    
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *input = m_input.output(last_fill, samples);
+      const float *impulse = m_impulse.data();
+      int impulse_length = m_impulse.length();
+      int history_read_pos = (m_history_write_pos + 1) % impulse_length;
+      
+      for(int i=0; i<samples; i++)
+      {
+        float verb = 0.0;
+        for(int j=0; j<impulse_length; j++)
+          verb += m_history[(history_read_pos+j)%impulse_length] * impulse[j];
+        m_output[i] = input[i] + verb * m_wet;
+        m_history[m_history_write_pos] = input[i];
+        if(++m_history_write_pos >= impulse_length) m_history_write_pos = 0;
+      }
+    }
+  
+  private:
+    Module &m_input;
+    Sample &m_impulse;
+    float *m_history;
+    int m_history_write_pos;
+    float m_wet;
+};
+*/
+
 void produceStream(short *buffer, int samples)
 {
-  static Constant freq_lfo_frequency(4);
-  static Constant freq_lfo_amplitude(10);
-  static Constant osc1_base_frequency(200);
-  static Constant osc2_base_frequency(200*1.5);
-  static Constant osc_amplitude(.25);
-  static Sine freq_lfo(freq_lfo_frequency.output(), freq_lfo_amplitude.output());
-  static Mixer osc1_frequency;
-  static Mixer osc2_frequency;
-  static Triangle osc1(osc1_frequency.output(), osc_amplitude.output());
-  static Triangle osc2(osc2_frequency.output(), osc_amplitude.output());
-  static Mixer osc_mix;
-  static Overdrive output(osc_mix.output(), 3.0, 0.5, 3.0);
-  
-  static bool first = true;
-  if(first)
-  {
-    osc1_frequency.addInput(osc1_base_frequency.output());
-    osc1_frequency.addInput(freq_lfo.output());
-    osc2_frequency.addInput(osc2_base_frequency.output());
-    osc2_frequency.addInput(freq_lfo.output());
-    osc_mix.addInput(osc1.output());
-    osc_mix.addInput(osc2.output());    
+  static Constant freq_lfo_frequency(5);
+  static Sine freq_lfo_unit(freq_lfo_frequency);
+  static UnitScaler freq_lfo(freq_lfo_unit, -3, 3);
 
-    freq_lfo_frequency.fill(samples);
-    freq_lfo_amplitude.fill(samples);
-    osc1_base_frequency.fill(samples);
-    osc2_base_frequency.fill(samples);
-    osc_amplitude.fill(samples);
+  static Constant gate_frequency(3.0f);
+  static Constant gate_pulsewidth(0.8f);
+  static Pulse gate_unit(gate_frequency, gate_pulsewidth);
+  static UnitScaler gate(gate_unit, 0, 1);
+  static EnvelopeGenerator env(gate, 0.01f, 0.2f, 0.25f, 0.03f);
 
-    first = false;
-  }
+  static Noise noise;
+  static SampleAndHold noise_sandh(noise, gate);
+  static UnitScaler note_loose(noise_sandh, 24, 60);
+  static Quantize note(note_loose);
+  static NoteToFrequency base_frequency(note);
+  static Constant freq_multiplier(1.01);
+  static Multiply osc2_base_frequency(base_frequency, freq_multiplier);
+  static Add osc1_frequency(     base_frequency, freq_lfo);
+  static Add osc2_frequency(osc2_base_frequency, freq_lfo);
+
+  static Saw osc1(osc1_frequency);
+  static Saw osc2(osc2_frequency);
+  static Add osc_mix(osc1, osc2);
+
+  static Overdrive overdrive(osc_mix, 1);
+
+  static Constant cutoff_lfo_frequency(0.2f);
+  static UnitScaler cutoff_env(env, 250, 750); 
+  static Sine cutoff_lfo_unit(cutoff_lfo_frequency);
+  static UnitScaler cutoff_lfo(cutoff_lfo_unit, 0, 600);
+  static Add cutoff(cutoff_lfo, cutoff_env); 
+  static Constant filter_resonance(0.9f);
+  static Filter filter(overdrive, cutoff, filter_resonance);
+
+  static Multiply notes(filter, env);
   
-  freq_lfo.fill(samples);
-  osc1_frequency.fill(samples);
-  osc2_frequency.fill(samples);
-  osc1.fill(samples);
-  osc2.fill(samples);
-  osc_mix.fill(samples);
-  output.fill(samples);
+  static Constant delay_wet(0.9f);
+  static Constant delay_feedback(0.1f);
+  static Constant delay_speed(1.0f);
+  //static Delay output(0.023f, notes, delay_wet, delay_feedback, delay_speed);
+  static Delay output(1.5/3.0, 0.2, notes, delay_wet, delay_feedback, delay_speed);
+  //static Delay d3(0.037f, d2, delay_wet, delay_feedback, delay_speed);
+  //static Delay output(0.053f, d3, delay_wet, delay_feedback, delay_speed);
+  
+  static float time = 0;  
+  const float *o = output.output(time, samples);
+  time += 1.0;
   
   for(int i=0; i<samples; i++)
   {
-    const float *o = output.output();
     *buffer++ = short(o[i] * 32767);
     *buffer++ = short(o[i] * 32767);
   }
