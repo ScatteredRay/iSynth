@@ -1,7 +1,10 @@
-#include <CoreServices/CoreServices.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <AssertMacros.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include <AudioUnit/AudioUnit.h>
+#include <AudioUnit/AUComponent.h>
+#include <AudioUnit/AudioComponent.h>
 
 #include <math.h>
 
@@ -17,9 +20,6 @@ OSStatus AudRenderCallback(void* inRefCon,
                         UInt32 inNumberFrames,
                         AudioBufferList* ioData)
 {
-    printf("Audio Render Callback: %d\n", ioData->mNumberBuffers);
-    float FrameLength = 1.0f/44100.0f;
-    
     produceStream((short*)ioData->mBuffers[0].mData, inNumberFrames);
 
     FinishedFrames += inNumberFrames;
@@ -41,7 +41,7 @@ void streamSound()
     
     verify_noerr(AudioOutputUnitStop(gOutputUnit));
 
-    CloseComponent(gOutputUnit);
+    AudioComponentInstanceDispose(gOutputUnit);
 }
 
 void setupSound()
@@ -49,17 +49,17 @@ void setupSound()
     FinishedFrames = 0;
     OSStatus err = noErr;
     
-    ComponentDescription desc;
+    AudioComponentDescription desc;
     desc.componentType = kAudioUnitType_Output;
-    desc.componentSubType = kAudioUnitSubType_DefaultOutput;
+    desc.componentSubType = kAudioUnitSubType_GenericOutput;
     desc.componentManufacturer = kAudioUnitManufacturer_Apple;
     desc.componentFlags = 0;
     desc.componentFlagsMask = 0;
     
-    Component comp = FindNextComponent(NULL, &desc);
+    AudioComponent comp = AudioComponentFindNext(NULL, &desc);
     verify(comp);
     
-    err = OpenAComponent(comp, &gOutputUnit);
+    err = AudioComponentInstanceNew(comp, &gOutputUnit);
     verify(comp);
 
     err = AudioUnitInitialize(gOutputUnit);
