@@ -51,7 +51,11 @@ void setupSound()
     
     AudioComponentDescription desc;
     desc.componentType = kAudioUnitType_Output;
-    desc.componentSubType = kAudioUnitSubType_GenericOutput;
+#if TARGET_OS_IPHONE
+    desc.componentSubType = kAudioUnitSubType_RemoteIO;
+#else
+    desc.componentSubType = kAudioUnitSubType_DefaultOutput;
+#endif
     desc.componentManufacturer = kAudioUnitManufacturer_Apple;
     desc.componentFlags = 0;
     desc.componentFlagsMask = 0;
@@ -60,7 +64,7 @@ void setupSound()
     verify(comp);
     
     err = AudioComponentInstanceNew(comp, &gOutputUnit);
-    verify(comp);
+    verify(!err);
 
     err = AudioUnitInitialize(gOutputUnit);
     verify(!err);
