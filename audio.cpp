@@ -22,9 +22,16 @@
 #include <cmath>
 #include <vector>
 
+#define _CRT_SECURE_NO_WARNINGS
+#pragma warning(disable : 4244)
+#pragma warning(disable : 4305)
+
 const float pi = 3.1415926535897932384626f, e = 2.71828183f;
+const float note_0 = 8.1757989156;
 const int max_buffer_size = 4000;
 const int sample_rate = 44100;
+
+#define IMPULSE_PATH "impulses/"
 
 class Module
 {
@@ -79,7 +86,7 @@ class Saw : public Oscillator
         
         m_output[i] = (m_position-0.5f)*2;
       
-        m_position += frequency[i] / 44100;
+        m_position += frequency[i] / sample_rate;
         m_position -= int(m_position);
       }
     }
@@ -99,8 +106,8 @@ class Pulse : public Oscillator
       
       for(int i=0; i<samples; i++)
       {
-        m_output[i] = (m_position > pulsewidth[i]) ? 1.0f:-1.0f;      
-        m_position += frequency[i] / 44100;
+        m_output[i] = (m_position > pulsewidth[i]) ? -1.0f:1.0f;      
+        m_position += frequency[i] / sample_rate;
         m_position -= int(m_position);
       }
     }
@@ -122,7 +129,7 @@ class Sine : public Oscillator
       {
         m_output[i] = sin(m_position*2*pi);
       
-        m_position += frequency[i] / 44100;
+        m_position += frequency[i] / sample_rate;
         m_position -= int(m_position);
       }
     }
@@ -143,22 +150,103 @@ class Triangle : public Oscillator
         if(m_position < .5f) m_output[i] = (m_position-0.25f) *  4;
         else                 m_output[i] = (m_position-0.75f) * -4;
       
-        m_position += frequency[i] / 44100;
+        m_position += frequency[i] / sample_rate;
         m_position -= int(m_position);
       }
     }
 };
 
+class Noise : public Module
+{
+  public:
+    Noise() {}
+    
+    void fill(float latest_fill, int samples)
+    {
+      for(int i=0; i<samples; i++)
+        m_output[i] = 2.0f*rand()/RAND_MAX - 1.0;
+    }
+};
+
+class SampleAndHold : public Module
+{
+  public:
+    SampleAndHold(Module &source, Module &trigger)
+    : m_source(source), m_trigger(trigger), m_value(0), m_waiting(true)
+    {}
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *source  = m_source .output(last_fill, samples);
+      const float *trigger = m_trigger.output(last_fill, samples);
+      
+      for(int i=0; i<samples; i++)
+      {
+        if(!m_waiting)
+        {
+          if(trigger[i] < 0.1) m_waiting = true;
+        }
+        else
+        {
+          if(trigger[i] > 0.9)
+          {
+            m_waiting = false;
+            m_value = source[i];
+          }
+        }
+        m_output[i] = m_value;
+      }
+    }
+    
+  private:
+    Module &m_source, &m_trigger;
+    float m_value;
+    bool m_waiting;
+};
+
+class Quantize : public Module
+{
+  public: 
+    Quantize(Module &input) : m_input(input) {}
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *input = m_input.output(last_fill, samples);
+      for(int i=0; i<samples; i++)
+        m_output[i] = floor(input[i]+0.5);
+    }
+  
+  private:
+    Module &m_input;
+};
+
+class NoteToFrequency : public Module
+{
+  public:
+    NoteToFrequency(Module &input) : m_input(input) {}
+        
+    void fill(float last_fill, int samples)
+    {
+      const float *input = m_input.output(last_fill, samples);
+      for(int i=0; i<samples; i++)
+        m_output[i] = pow(2, input[i]/12) * note_0;
+    }
+    
+  private:
+    Module &m_input;
+};
+
 class Add : public Module
 {
   public:
+    Add() {}
     Add(Module &a, Module &b)
     {
-      addInput(&a);
-      addInput(&b);
+      addInput(a);
+      addInput(b);
     }
    
-    void addInput(Module *input) { m_inputs.push_back(input); }
+    void addInput(Module &input) { m_inputs.push_back(&input); }
     
     void fill(float latest_fill, int samples)
     {
@@ -356,21 +444,55 @@ class EnvelopeGenerator : public Module
     float m_attack, m_decay, m_sustain, m_release;    
 };
 
+
+// maybe support sweeping the length too?  i bet that would sound awesome
+// speed parameter currently unimplemented
 class Delay : public Module
 {
-  public:
-    Delay(int max_length = 44100) : Module()
+  public: 
+    Delay(float length, float filter, Module &input, Module &wet,
+          Module &feedback, Module &speed)
+    : m_buffer(new float[int(length*sample_rate)]),
+      m_length(int(length*sample_rate)),
+      m_read_pos(1), m_write_pos(0), m_last_sample(0), m_filter(filter),
+      m_input(input), m_wet(wet), m_feedback(feedback), m_speed(speed)
     {
-      buffer = new float[max_length];
+      memset(m_buffer, 0, m_length*sizeof(float));
     }
     
     ~Delay()
     {
-      delete[] buffer;
+      delete[] m_buffer;
+    }
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *input    = m_input   .output(last_fill, samples);
+      const float *wet      = m_wet     .output(last_fill, samples);
+      const float *feedback = m_feedback.output(last_fill, samples);
+      const float *speed    = m_speed   .output(last_fill, samples);
+      
+      for(int i=0; i<samples; i++)
+      { 
+        float sample = m_buffer[int(floor(m_read_pos))]*m_filter + m_last_sample*(1-m_filter);
+        m_last_sample = sample;
+        m_output[i] = input[i] + sample * wet[i];
+        m_buffer[m_write_pos] = input[i] + sample * feedback[i];
+        
+        if(++m_write_pos >= m_length) m_write_pos -= m_length;
+        if(++m_read_pos  >= m_length) m_read_pos  -= m_length;
+      }
     }
   
   private:
-    float *buffer;
+    float *m_buffer;
+    int m_length;
+    float m_filter;
+    float m_read_pos;
+    float m_last_sample;
+    int m_write_pos;
+    
+    Module &m_input, &m_wet, &m_feedback, &m_speed;
 };
 
 class UnitScaler : public Module
@@ -396,10 +518,7 @@ class UnitScaler : public Module
 class Constant : public Module
 {
   public:
-    Constant(float value) : Module()
-    {
-      setValue(value);
-    }
+    Constant(float value) : Module() { setValue(value); }
   
     void fill(float last_fill, int samples) {}
 
@@ -409,22 +528,103 @@ class Constant : public Module
     }
 };
 
+/*
+class Sample
+{
+  public:
+    Sample(const char *filename)
+    {
+      // presuming 16 bit input
+      FILE *in = fopen(filename, "rb");
+      if(!in) throw "couldn't open file";
+      fseek(in, 0, SEEK_END);
+      m_length = ftell(in)/2;
+      m_data = new float[m_length];
+      fseek(in, 0, SEEK_SET);
+      for(int i=0; i<m_length; i++)
+      {
+        signed short s;
+        fread(&s, 1, 2, in);
+        m_data[i] = s/32768.0;
+      }
+    }
+    
+    const float *data() const { return m_data; }
+    int length() const { return m_length; }
+    
+    ~Sample()
+    {
+      delete[] m_data;
+    }
+
+  private:
+    float *m_data;
+    int m_length;
+};
+
+class Convolver : public Module
+{
+  public:
+    Convolver(Module &input, Sample &impulse, float wet)
+    : m_input(input), m_impulse(impulse), m_wet(wet), m_history_write_pos(0)
+    {
+      m_history = new float[impulse.length()];
+      memset(m_history, 0, impulse.length()*sizeof(float));
+    }
+    
+    ~Convolver()
+    {
+      delete[] m_history;
+    }    
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *input = m_input.output(last_fill, samples);
+      const float *impulse = m_impulse.data();
+      int impulse_length = m_impulse.length();
+      int history_read_pos = (m_history_write_pos + 1) % impulse_length;
+      
+      for(int i=0; i<samples; i++)
+      {
+        float verb = 0.0;
+        for(int j=0; j<impulse_length; j++)
+          verb += m_history[(history_read_pos+j)%impulse_length] * impulse[j];
+        m_output[i] = input[i] + verb * m_wet;
+        m_history[m_history_write_pos] = input[i];
+        if(++m_history_write_pos >= impulse_length) m_history_write_pos = 0;
+      }
+    }
+  
+  private:
+    Module &m_input;
+    Sample &m_impulse;
+    float *m_history;
+    int m_history_write_pos;
+    float m_wet;
+};
+*/
+
 void produceStream(short *buffer, int samples)
 {
   static Constant freq_lfo_frequency(5);
   static Sine freq_lfo_unit(freq_lfo_frequency);
   static UnitScaler freq_lfo(freq_lfo_unit, -3, 3);
 
-  static Constant osc1_base_frequency(55);
-  static Constant osc2_base_frequency(55*1.01f);
-  static Add osc1_frequency(osc1_base_frequency, freq_lfo);
-  static Add osc2_frequency(osc2_base_frequency, freq_lfo);
-
-  static Constant gate_frequency(6.0f);
-  static Constant gate_pulsewidth(0.2f);
+  static Constant gate_frequency(3.0f);
+  static Constant gate_pulsewidth(0.8f);
   static Pulse gate_unit(gate_frequency, gate_pulsewidth);
   static UnitScaler gate(gate_unit, 0, 1);
-  static EnvelopeGenerator env(gate, 0.01f, 0.5f, 0.25f, 0.03f);
+  static EnvelopeGenerator env(gate, 0.01f, 0.2f, 0.25f, 0.03f);
+
+  static Noise noise;
+  static SampleAndHold noise_sandh(noise, gate);
+  static UnitScaler note_loose(noise_sandh, 24, 60);
+  static Quantize note(note_loose);
+  static NoteToFrequency base_frequency(note);
+  static Constant freq_multiplier(1.01);
+  static Multiply osc2_base_frequency(base_frequency, freq_multiplier);
+  static Add osc1_frequency(     base_frequency, freq_lfo);
+  static Add osc2_frequency(osc2_base_frequency, freq_lfo);
 
   static Saw osc1(osc1_frequency);
   static Saw osc2(osc2_frequency);
@@ -440,7 +640,15 @@ void produceStream(short *buffer, int samples)
   static Constant filter_resonance(0.9f);
   static Filter filter(overdrive, cutoff, filter_resonance);
 
-  static Multiply output(filter, env);
+  static Multiply notes(filter, env);
+  
+  static Constant delay_wet(0.9f);
+  static Constant delay_feedback(0.1f);
+  static Constant delay_speed(1.0f);
+  //static Delay output(0.023f, notes, delay_wet, delay_feedback, delay_speed);
+  static Delay output(1.5/3.0, 0.2, notes, delay_wet, delay_feedback, delay_speed);
+  //static Delay d3(0.037f, d2, delay_wet, delay_feedback, delay_speed);
+  //static Delay output(0.053f, d3, delay_wet, delay_feedback, delay_speed);
   
   static float time = 0;  
   const float *o = output.output(time, samples);
