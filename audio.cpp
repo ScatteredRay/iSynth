@@ -16,11 +16,32 @@
    
    okay, okay, hear me out on this one: a stereo module can *convert to
    stereo* if given mono input.  huh?  huh?  i like it.
+   
+   Todo:
+   - scale quantizer
+   - clipper
+   - hard/soft-limiter
+   - panner
+   - ping pong delay
+   - rectifier
+   - sample playback
+   - oscillator hardsync
+   - oscillator band-limiting
+   - slew limiter
+   - switch   
+   - additional filters?  eq?
+   - reverb
+   - exponential envgen, DADSR, parameterized shape
+   - stereo subsystem
+   - multiplexing subsystem
 */
 
 #include <cstdio>
 #include <cmath>
+#include <string>
 #include <vector>
+
+using namespace std;
 
 #define _CRT_SECURE_NO_WARNINGS
 #pragma warning(disable : 4244)
@@ -31,15 +52,74 @@ const float note_0 = 8.1757989156;
 const int max_buffer_size = 4000;
 const int sample_rate = 44100;
 
-#define IMPULSE_PATH "impulses/"
+class WaveOut
+{
+  public:    
+    WaveOut(const std::string filename, float scaler=32768, bool stereo=false)
+    : m_scaler(scaler), m_length(0)
+    {
+      m_out = fopen(filename.c_str(), "wb");
+      unsigned char header[] = 
+      { 
+        'R', 'I', 'F', 'F',
+        0x00, 0x00, 0x00, 0x00, // wave size+36; patch later
+        'W', 'A', 'V', 'E', 'f', 'm', 't', ' ',
+        0x10, 0x00, 0x00, 0x00, 0x01, 0x00, // PCM
+        0x01, 0x00, // channels
+        0x44, 0xAC, 0x00, 0x00, // 44.1khz
+        0x10, 0xB1, 0x02, 0x00, // 176400 bytes/sec
+        0x02, 0x00, // bytes per sample*channels
+        0x10, 0x00, // 16 bits
+        'd', 'a', 't', 'a',
+        0x00, 0x00, 0x00, 0x00, // wave size again
+      };
+      if(stereo) header[22] = 0x02, header[32] = 0x04;
+      fwrite(header, sizeof(header), 1, m_out);
+    }
+    
+    ~WaveOut() { close(); }
+    
+    void close()
+    {
+      if(!m_out) return;
+
+      int chunklength = m_length*2+36;
+      fseek(m_out, 4, SEEK_SET);
+      fwrite(&chunklength, 4, 1, m_out);
+      
+      chunklength -= 36;
+      fseek(m_out, 40, SEEK_SET);
+      fwrite(&chunklength, 4, 1, m_out);
+      
+      fclose(m_out);
+      m_out = 0;
+    }
+    
+    void writeBuffer(const float *buffer, int size)
+    {
+      static short out[max_buffer_size];
+      for(int i=0; i<size; i++)
+        out[i] = short(buffer[i]*m_scaler);
+      fwrite(out, 2, size, m_out);
+      m_length += size;
+    }
+
+  private:
+    FILE *m_out;
+    float m_scaler;
+    int m_length;
+};
 
 class Module
 {
   public:
-    Module()
+    Module() : m_latest_fill(0), m_wout(0)
     {
       for(int i=0; i<max_buffer_size; i++) m_output[i] = 0;
-      m_latest_fill = 0;
+    }
+    ~Module()
+    {
+      if(m_wout) delete m_wout;
     }
         
     virtual void fill(float latest_fill, int samples) = 0;
@@ -50,13 +130,20 @@ class Module
       {
         fill(latest_fill, samples);
         m_latest_fill = latest_fill;
+        if(m_wout) m_wout->writeBuffer(m_output, samples);
       }
       return m_output;
+    }
+    
+    void log(const string filename, float scaler=32768)
+    {
+      if(!m_wout) m_wout = new WaveOut(filename, scaler);
     }
   
   protected:  
     float m_output[max_buffer_size];
     float m_latest_fill;
+    WaveOut *m_wout;
 };
 
 class Oscillator : public Module
@@ -230,6 +317,7 @@ class NoteToFrequency : public Module
       const float *input = m_input.output(last_fill, samples);
       for(int i=0; i<samples; i++)
         m_output[i] = pow(2, input[i]/12) * note_0;
+      printf("%g: %g\n", input[0], m_output[0]);
     }
     
   private:
@@ -528,82 +616,6 @@ class Constant : public Module
     }
 };
 
-/*
-class Sample
-{
-  public:
-    Sample(const char *filename)
-    {
-      // presuming 16 bit input
-      FILE *in = fopen(filename, "rb");
-      if(!in) throw "couldn't open file";
-      fseek(in, 0, SEEK_END);
-      m_length = ftell(in)/2;
-      m_data = new float[m_length];
-      fseek(in, 0, SEEK_SET);
-      for(int i=0; i<m_length; i++)
-      {
-        signed short s;
-        fread(&s, 1, 2, in);
-        m_data[i] = s/32768.0;
-      }
-    }
-    
-    const float *data() const { return m_data; }
-    int length() const { return m_length; }
-    
-    ~Sample()
-    {
-      delete[] m_data;
-    }
-
-  private:
-    float *m_data;
-    int m_length;
-};
-
-class Convolver : public Module
-{
-  public:
-    Convolver(Module &input, Sample &impulse, float wet)
-    : m_input(input), m_impulse(impulse), m_wet(wet), m_history_write_pos(0)
-    {
-      m_history = new float[impulse.length()];
-      memset(m_history, 0, impulse.length()*sizeof(float));
-    }
-    
-    ~Convolver()
-    {
-      delete[] m_history;
-    }    
-    
-    void fill(float last_fill, int samples)
-    {
-      const float *input = m_input.output(last_fill, samples);
-      const float *impulse = m_impulse.data();
-      int impulse_length = m_impulse.length();
-      int history_read_pos = (m_history_write_pos + 1) % impulse_length;
-      
-      for(int i=0; i<samples; i++)
-      {
-        float verb = 0.0;
-        for(int j=0; j<impulse_length; j++)
-          verb += m_history[(history_read_pos+j)%impulse_length] * impulse[j];
-        m_output[i] = input[i] + verb * m_wet;
-        m_history[m_history_write_pos] = input[i];
-        if(++m_history_write_pos >= impulse_length) m_history_write_pos = 0;
-      }
-    }
-  
-  private:
-    Module &m_input;
-    Sample &m_impulse;
-    float *m_history;
-    int m_history_write_pos;
-    float m_wet;
-};
-*/
-
 void produceStream(short *buffer, int samples)
 {
   static Constant freq_lfo_frequency(5);
@@ -618,7 +630,7 @@ void produceStream(short *buffer, int samples)
 
   static Noise noise;
   static SampleAndHold noise_sandh(noise, gate);
-  static UnitScaler note_loose(noise_sandh, 24, 60);
+  static UnitScaler note_loose(noise_sandh, 24, 36);
   static Quantize note(note_loose);
   static NoteToFrequency base_frequency(note);
   static Constant freq_multiplier(1.01);
@@ -629,6 +641,8 @@ void produceStream(short *buffer, int samples)
   static Saw osc1(osc1_frequency);
   static Saw osc2(osc2_frequency);
   static Add osc_mix(osc1, osc2);
+  
+  //osc_mix.log("oscmix.wav");
 
   static Overdrive overdrive(osc_mix, 1);
 
@@ -647,6 +661,7 @@ void produceStream(short *buffer, int samples)
   static Constant delay_speed(1.0f);
   //static Delay output(0.023f, notes, delay_wet, delay_feedback, delay_speed);
   static Delay output(1.5/3.0, 0.2, notes, delay_wet, delay_feedback, delay_speed);
+  //output.log("out.wav");
   //static Delay d3(0.037f, d2, delay_wet, delay_feedback, delay_speed);
   //static Delay output(0.053f, d3, delay_wet, delay_feedback, delay_speed);
   
@@ -657,6 +672,8 @@ void produceStream(short *buffer, int samples)
   for(int i=0; i<samples; i++)
   {
     *buffer++ = short(o[i] * 32767);
+#ifndef __APPLE__
     *buffer++ = short(o[i] * 32767);
+#endif
   }
 }
