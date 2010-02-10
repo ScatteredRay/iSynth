@@ -7,18 +7,14 @@
    reverb trails off.  can't check for that, though, because we're not
    reverbing each channel individually.
    
-   stereo: ulch, for now just let the convolution be a special case at the end.
-   maybe we can make mono/stereo modules work similarly, where stereo modules
-   maintain both channels but can mixdown if a mono module requests -- but it
-   really should work the opposite way, whereas multiplex modules are a way
-   to take poly input and produce a single output, stereo is a way to take a
-   single input and produce two outputs.
-   
-   okay, okay, hear me out on this one: a stereo module can *convert to
-   stereo* if given mono input.  huh?  huh?  i like it.
+   stereo: 
+   should be separate stereo modules.  there'll be some code duplication but
+   not a crazy amount.  conversion between them should be explicit.  i.e. a
+   StereoModule that takes Modules as input, or vice versa.
    
    Todo:
-   - scale quantizer
+   - sequencer (retriggerable)
+   - multiple intonations!  just, meantone, quarter tone, well-tempered, etc.
    - clipper
    - hard/soft-limiter
    - panner
@@ -34,6 +30,9 @@
    - exponential envgen, DADSR, parameterized shape
    - stereo subsystem
    - multiplexing subsystem
+   Done:
+   - x/y input
+   - scale quantizer -- actually, "scale" should be a parameter of "notetofrequency"!
 */
 
 #include <cstdio>
@@ -41,16 +40,44 @@
 #include <string>
 #include <vector>
 
+#include "input.h"
+
 using namespace std;
 
 #define _CRT_SECURE_NO_WARNINGS
 #pragma warning(disable : 4244)
 #pragma warning(disable : 4305)
+#pragma warning(disable : 4996) // fopen() purportedly unsafe
 
 const float pi = 3.1415926535897932384626f, e = 2.71828183f;
 const float note_0 = 8.1757989156;
 const int max_buffer_size = 4000;
 const int sample_rate = 44100;
+
+struct
+{ const char *name;
+  const char *steps;
+} scales[] =
+{
+  { "major",      "\2\2\1\2\2\2\1" },
+  { "minor",      "\2\1\2\2\1\2\2" },
+  { "dorian",     "\2\1\2\2\2\1\2" },
+  { "phrygian",   "\1\2\2\2\1\2\2" },
+  { "lydian",     "\2\2\2\1\2\2\1" },
+  { "mixolydian", "\2\2\1\2\2\1\2" },
+  { "locrian",    "\1\2\2\1\2\2\2" },
+  { "pentatonic", "\2\2\3\2\3" },
+  { "pent minor", "\3\2\2\3\2" },
+  { "chromatic",  "\1" },
+  { "whole",      "\2" },
+  { "Minor 3rd",  "\3" },
+  { "3rd",        "\4" },
+  { "4ths",       "\5" },
+  { "Tritone",    "\6" },
+  { "5ths",       "\7" },
+  { "Octave",     "\12" },
+  { 0,            0 }
+};
 
 class WaveOut
 {
@@ -113,7 +140,7 @@ class WaveOut
 class Module
 {
   public:
-    Module() : m_latest_fill(0), m_wout(0)
+    Module() : m_last_fill(0), m_wout(0)
     {
       for(int i=0; i<max_buffer_size; i++) m_output[i] = 0;
     }
@@ -122,14 +149,14 @@ class Module
       if(m_wout) delete m_wout;
     }
         
-    virtual void fill(float latest_fill, int samples) = 0;
+    virtual void fill(float last_fill, int samples) = 0;
     
-    const float *output(float latest_fill, int samples)
+    const float *output(float last_fill, int samples)
     {
-      if(m_latest_fill < latest_fill)
+      if(m_last_fill < last_fill)
       {
-        fill(latest_fill, samples);
-        m_latest_fill = latest_fill;
+        fill(last_fill, samples);
+        m_last_fill = last_fill;
         if(m_wout) m_wout->writeBuffer(m_output, samples);
       }
       return m_output;
@@ -142,7 +169,7 @@ class Module
   
   protected:  
     float m_output[max_buffer_size];
-    float m_latest_fill;
+    float m_last_fill;
     WaveOut *m_wout;
 };
 
@@ -164,9 +191,9 @@ class Saw : public Oscillator
   public:
     Saw(Module &frequency) : Oscillator(frequency) {}
     
-    void fill(float latest_fill, int samples)
+    void fill(float last_fill, int samples)
     {
-      const float *frequency = m_frequency.output(latest_fill, samples);
+      const float *frequency = m_frequency.output(last_fill, samples);
       
       for(int i=0; i<samples; i++)
       {
@@ -186,10 +213,10 @@ class Pulse : public Oscillator
     : Oscillator(frequency), m_pulsewidth(pulsewidth)
     {}
     
-    void fill(float latest_fill, int samples)
+    void fill(float last_fill, int samples)
     {
-      const float *frequency  = m_frequency .output(latest_fill, samples);
-      const float *pulsewidth = m_pulsewidth.output(latest_fill, samples);
+      const float *frequency  = m_frequency .output(last_fill, samples);
+      const float *pulsewidth = m_pulsewidth.output(last_fill, samples);
       
       for(int i=0; i<samples; i++)
       {
@@ -208,9 +235,9 @@ class Sine : public Oscillator
   public:
     Sine(Module &frequency) : Oscillator(frequency) {}
 
-    void fill(float latest_fill, int samples)
+    void fill(float last_fill, int samples)
     {
-      const float *frequency  = m_frequency.output(latest_fill, samples);
+      const float *frequency  = m_frequency.output(last_fill, samples);
 
       for(int i=0; i<samples; i++)
       {
@@ -228,9 +255,9 @@ class Triangle : public Oscillator
     Triangle(Module &frequency) : Oscillator(frequency)
     {}
 
-    void fill(float latest_fill, int samples)
+    void fill(float last_fill, int samples)
     {
-      const float *frequency  = m_frequency.output(latest_fill, samples);
+      const float *frequency  = m_frequency.output(last_fill, samples);
 
       for(int i=0; i<samples; i++)
       {
@@ -248,7 +275,7 @@ class Noise : public Module
   public:
     Noise() {}
     
-    void fill(float latest_fill, int samples)
+    void fill(float last_fill, int samples)
     {
       for(int i=0; i<samples; i++)
         m_output[i] = 2.0f*rand()/RAND_MAX - 1.0;
@@ -310,18 +337,40 @@ class Quantize : public Module
 class NoteToFrequency : public Module
 {
   public:
-    NoteToFrequency(Module &input) : m_input(input) {}
+    NoteToFrequency(Module &input, int key, const char *scale)
+    : m_input(input)
+    {
+      setScale(key, scale);
+    }
+    
+    void setScale(int key, const char *scale)
+    {
+      int note = key;
+      const char *scalepos = scale;
+      for(int i=0; i<128; i++)
+      {
+        notes[i] = note;
+        note += *scalepos++;
+        if(*scalepos == 0) scalepos = scale;
+      }
+    }
         
     void fill(float last_fill, int samples)
     {
       const float *input = m_input.output(last_fill, samples);
       for(int i=0; i<samples; i++)
-        m_output[i] = pow(2, input[i]/12) * note_0;
-      printf("%g: %g\n", input[0], m_output[0]);
+      {
+        int scaledegree = input[i];
+        if(scaledegree > 127) scaledegree = 127;
+        if(scaledegree < 0  ) scaledegree = 0;
+        int note = notes[scaledegree];
+        m_output[i] = pow(2.0, note/12.0) * note_0;
+      }
     }
     
   private:
     Module &m_input;
+    int notes[128];
 };
 
 class Add : public Module
@@ -336,14 +385,14 @@ class Add : public Module
    
     void addInput(Module &input) { m_inputs.push_back(&input); }
     
-    void fill(float latest_fill, int samples)
+    void fill(float last_fill, int samples)
     {
       if(m_inputs.size() == 0) return;
       
-      memcpy(m_output, m_inputs[0]->output(latest_fill, samples), samples * sizeof(float));
+      memcpy(m_output, m_inputs[0]->output(last_fill, samples), samples * sizeof(float));
       for(unsigned int i=1; i<m_inputs.size(); i++)
       {
-        const float *input = m_inputs[i]->output(latest_fill, samples);
+        const float *input = m_inputs[i]->output(last_fill, samples);
         for(int j=0; j<samples; j++)
           m_output[j] += input[j];
       }
@@ -606,7 +655,7 @@ class UnitScaler : public Module
 class Constant : public Module
 {
   public:
-    Constant(float value) : Module() { setValue(value); }
+    Constant(float value) { setValue(value); }
   
     void fill(float last_fill, int samples) {}
 
@@ -616,54 +665,50 @@ class Constant : public Module
     }
 };
 
+class Input : public Module
+{
+  public:
+    Input(int axis) : m_axis(axis) {}
+    
+    void fill(float last_fill, int samples)
+    {
+      readInputAxis(m_axis, m_output, samples);
+    }
+  
+  private:
+    int m_axis;
+};
+
 void produceStream(short *buffer, int samples)
 {
-  static Constant freq_lfo_frequency(5);
-  static Sine freq_lfo_unit(freq_lfo_frequency);
-  static UnitScaler freq_lfo(freq_lfo_unit, -3, 3);
+  static Input x(0);
+  static Input y(1);
+  static Input touch(2);
 
-  static Constant gate_frequency(3.0f);
-  static Constant gate_pulsewidth(0.8f);
-  static Pulse gate_unit(gate_frequency, gate_pulsewidth);
-  static UnitScaler gate(gate_unit, 0, 1);
-  static EnvelopeGenerator env(gate, 0.01f, 0.2f, 0.25f, 0.03f);
-
-  static Noise noise;
-  static SampleAndHold noise_sandh(noise, gate);
-  static UnitScaler note_loose(noise_sandh, 24, 36);
-  static Quantize note(note_loose);
-  static NoteToFrequency base_frequency(note);
+  static UnitScaler note_offset(x, 15, 25);
+  static Quantize note_tuned(note_offset);
+  static NoteToFrequency osc1_frequency(note_tuned, 5, "\3\2\2\3\2");
   static Constant freq_multiplier(1.01);
-  static Multiply osc2_base_frequency(base_frequency, freq_multiplier);
-  static Add osc1_frequency(     base_frequency, freq_lfo);
-  static Add osc2_frequency(osc2_base_frequency, freq_lfo);
+  static Multiply osc2_frequency(osc1_frequency, freq_multiplier);
 
   static Saw osc1(osc1_frequency);
   static Saw osc2(osc2_frequency);
   static Add osc_mix(osc1, osc2);
+
+  static EnvelopeGenerator env(touch, 0.01f, 0.2f, 0.25f, 0.03f);
+
+  static UnitScaler cutoff_y(y, 250, 1500); 
+  static Add cutoff(osc1_frequency, cutoff_y); 
   
-  //osc_mix.log("oscmix.wav");
-
-  static Overdrive overdrive(osc_mix, 1);
-
-  static Constant cutoff_lfo_frequency(0.2f);
-  static UnitScaler cutoff_env(env, 250, 750); 
-  static Sine cutoff_lfo_unit(cutoff_lfo_frequency);
-  static UnitScaler cutoff_lfo(cutoff_lfo_unit, 0, 600);
-  static Add cutoff(cutoff_lfo, cutoff_env); 
   static Constant filter_resonance(0.9f);
-  static Filter filter(overdrive, cutoff, filter_resonance);
+  static Filter filter(osc_mix, cutoff, filter_resonance);
 
   static Multiply notes(filter, env);
   
-  static Constant delay_wet(0.9f);
-  static Constant delay_feedback(0.1f);
+  static Constant delay_wet(0.5f);
+  static Constant delay_feedback(0.6f);
   static Constant delay_speed(1.0f);
-  //static Delay output(0.023f, notes, delay_wet, delay_feedback, delay_speed);
   static Delay output(1.5/3.0, 0.2, notes, delay_wet, delay_feedback, delay_speed);
-  //output.log("out.wav");
-  //static Delay d3(0.037f, d2, delay_wet, delay_feedback, delay_speed);
-  //static Delay output(0.053f, d3, delay_wet, delay_feedback, delay_speed);
   
   static float time = 0;  
   const float *o = output.output(time, samples);
