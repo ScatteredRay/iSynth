@@ -13,14 +13,15 @@
    StereoModule that takes Modules as input, or vice versa.
    
    Todo:
+   - stereo rotate/expand
+   - sample playback (wave reader)
    - sequencer (retriggerable)
    - multiple intonations!  just, meantone, quarter tone, well-tempered, etc.
+   - replay output from wave, to find nasty clicks (wave reader)
    - clipper
    - hard/soft-limiter
    - panner
-   - ping pong delay
    - rectifier
-   - sample playback
    - oscillator hardsync
    - oscillator band-limiting
    - slew limiter
@@ -28,11 +29,14 @@
    - additional filters?  eq?
    - reverb
    - exponential envgen, DADSR, parameterized shape
-   - stereo subsystem
    - multiplexing subsystem
    Done:
    - x/y input
    - scale quantizer -- actually, "scale" should be a parameter of "notetofrequency"!
+   - stereo
+   - pan module
+   - stereoadd module
+   - ping pong delay
 */
 
 #include <cstdio>
@@ -140,13 +144,13 @@ class WaveOut
 class Module
 {
   public:
-    Module() : m_last_fill(0), m_wout(0)
+    Module() : m_last_fill(0), m_waveout(0)
     {
-      for(int i=0; i<max_buffer_size; i++) m_output[i] = 0;
+      memset(m_output, 0, max_buffer_size*sizeof(float));
     }
     ~Module()
     {
-      if(m_wout) delete m_wout;
+      if(m_waveout) delete m_waveout;
     }
         
     virtual void fill(float last_fill, int samples) = 0;
@@ -157,20 +161,48 @@ class Module
       {
         fill(last_fill, samples);
         m_last_fill = last_fill;
-        if(m_wout) m_wout->writeBuffer(m_output, samples);
+        if(m_waveout) m_waveout->writeBuffer(m_output, samples);
       }
       return m_output;
     }
     
     void log(const string filename, float scaler=32768)
     {
-      if(!m_wout) m_wout = new WaveOut(filename, scaler);
+      if(!m_waveout) m_waveout = new WaveOut(filename, scaler);
     }
   
   protected:  
     float m_output[max_buffer_size];
     float m_last_fill;
-    WaveOut *m_wout;
+    WaveOut *m_waveout;
+};
+
+class StereoModule : public Module
+{
+  public:
+    StereoModule()
+    {
+      memset(m_output, 0, max_buffer_size*2*sizeof(float));
+    }
+
+    const float *output(float last_fill, int samples)
+    {
+      if(m_last_fill < last_fill)
+      {
+        fill(last_fill, samples);
+        m_last_fill = last_fill;
+        if(m_waveout) m_waveout->writeBuffer(m_output, samples*2);
+      }
+      return m_output;
+    }
+
+    void log(const string filename, float scaler=32768)
+    {
+      if(!m_waveout) m_waveout = new WaveOut(filename, scaler, true);
+    }
+
+  protected:  
+    float m_output[max_buffer_size*2];
 };
 
 class Oscillator : public Module
@@ -431,7 +463,8 @@ class Filter : public Module
       {
         if(m_oldcutoff != cutoff[i] || m_oldresonance != resonance[i])
           recalculateFilter(cutoff[i], resonance[i]);
-          
+
+        //Inverted feed back for corner peaking
         float x = input[i] - m_r*m_y4;
 
         //Four cascaded onepole filters (bilinear transform)
@@ -582,17 +615,79 @@ class EnvelopeGenerator : public Module
 };
 
 
+
+class StereoDelay : public StereoModule
+{
+  public:
+    StereoDelay(float length, float filter, Module &input, Module &wet,
+                Module &dry, Module &feedback)
+    : m_buffer_left (new float[int(length*sample_rate)]),
+      m_buffer_right(new float[int(length*sample_rate)]),
+      m_length(int(length*sample_rate)), m_filter(filter),      
+      m_input(input), m_wet(wet), m_dry(dry), m_feedback(feedback),
+      m_read_pos(1), m_write_pos(0),
+      m_last_sample_left(0), m_last_sample_right(0)
+    {
+      memset(m_buffer_left,  0, m_length*sizeof(float));
+      memset(m_buffer_right, 0, m_length*sizeof(float));
+    }
+    
+    ~StereoDelay()
+    {
+      delete[] m_buffer_left;
+      delete[] m_buffer_right;
+    }
+
+    void fill(float last_fill, int samples)
+    {
+      const float *input    = m_input   .output(last_fill, samples);
+      const float *wet      = m_wet     .output(last_fill, samples);
+      const float *dry      = m_dry     .output(last_fill, samples);
+      const float *feedback = m_feedback.output(last_fill, samples);
+      
+      float *output = m_output;
+      
+      for(int i=0; i<samples; i++)
+      { 
+        float left_sample = m_buffer_left[m_read_pos]*m_filter +
+                            m_last_sample_left*(1-m_filter);
+        m_last_sample_left = left_sample;
+        m_buffer_left[m_write_pos] = input[i] + m_buffer_right[m_read_pos] * feedback[i];
+        *output++ = input[i]*dry[i] + left_sample*wet[i];
+        
+        float right_sample = m_buffer_right[m_read_pos]*m_filter +
+                            m_last_sample_right*(1-m_filter);
+        m_last_sample_right = right_sample;
+        m_buffer_right[m_write_pos] = m_buffer_left[m_read_pos] * feedback[i];
+        *output++ = input[i]*dry[i] + right_sample*wet[i];
+        
+        if(++m_write_pos >= m_length) m_write_pos -= m_length;
+        if(++m_read_pos  >= m_length) m_read_pos  -= m_length;
+      }
+    }
+
+  private:
+    float *m_buffer_left, *m_buffer_right;
+    int m_length;
+    float m_filter;
+    int m_read_pos, m_write_pos;
+    float m_last_sample_left, m_last_sample_right;
+    
+    Module &m_input, &m_wet, &m_dry, &m_feedback;
+};
+
 // maybe support sweeping the length too?  i bet that would sound awesome
 // speed parameter currently unimplemented
 class Delay : public Module
 {
   public: 
-    Delay(float length, float filter, Module &input, Module &wet,
+    Delay(float length, float filter, Module &input, Module &wet, Module &dry,
           Module &feedback, Module &speed)
     : m_buffer(new float[int(length*sample_rate)]),
       m_length(int(length*sample_rate)),
       m_read_pos(1), m_write_pos(0), m_last_sample(0), m_filter(filter),
-      m_input(input), m_wet(wet), m_feedback(feedback), m_speed(speed)
+      m_input(input), m_wet(wet), m_dry(dry), m_feedback(feedback),
+      m_speed(speed)
     {
       memset(m_buffer, 0, m_length*sizeof(float));
     }
@@ -606,6 +701,7 @@ class Delay : public Module
     {
       const float *input    = m_input   .output(last_fill, samples);
       const float *wet      = m_wet     .output(last_fill, samples);
+      const float *dry      = m_dry     .output(last_fill, samples);
       const float *feedback = m_feedback.output(last_fill, samples);
       const float *speed    = m_speed   .output(last_fill, samples);
       
@@ -613,7 +709,7 @@ class Delay : public Module
       { 
         float sample = m_buffer[int(floor(m_read_pos))]*m_filter + m_last_sample*(1-m_filter);
         m_last_sample = sample;
-        m_output[i] = input[i] + sample * wet[i];
+        m_output[i] = input[i]*dry[i] + sample * wet[i];
         m_buffer[m_write_pos] = input[i] + sample * feedback[i];
         
         if(++m_write_pos >= m_length) m_write_pos -= m_length;
@@ -629,7 +725,60 @@ class Delay : public Module
     float m_last_sample;
     int m_write_pos;
     
-    Module &m_input, &m_wet, &m_feedback, &m_speed;
+    Module &m_input, &m_wet, &m_dry, &m_feedback, &m_speed;
+};
+
+
+class Pan : public StereoModule
+{
+  public:
+    Pan(Module &input, Module &position)
+    : m_input(input), m_position(position) {}
+  
+    void fill(float last_fill, int samples)
+    {
+      const float *input = m_input   .output(last_fill, samples);      
+      const float *pos   = m_position.output(last_fill, samples);      
+      float *output = m_output;
+      
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = input[i] * (1.0-pos[i]);
+        *output++ = input[i] *      pos[i];
+      }
+    }
+
+  private:
+    Module &m_input, &m_position;  
+};
+
+class StereoAdd : public StereoModule
+{
+  public:
+    StereoAdd() {}
+    StereoAdd(StereoModule &a, StereoModule &b)
+    {
+      addInput(a);
+      addInput(b);
+    }
+   
+    void addInput(StereoModule &input) { m_inputs.push_back(&input); }
+    
+    void fill(float last_fill, int samples)
+    {
+      if(m_inputs.size() == 0) return;
+      
+      memcpy(m_output, m_inputs[0]->output(last_fill, samples), samples * sizeof(float) * 2);
+      for(unsigned int i=1; i<m_inputs.size(); i++)
+      {
+        const float *input = m_inputs[i]->output(last_fill, samples);
+        for(int j=0; j<samples*2; j++)
+          m_output[j] += input[j];
+      }
+    }
+    
+  private:
+    std::vector<StereoModule *> m_inputs;
 };
 
 class UnitScaler : public Module
@@ -685,7 +834,7 @@ void produceStream(short *buffer, int samples)
   static Input y(1);
   static Input touch(2);
 
-  static UnitScaler note_offset(x, 15, 25);
+  static UnitScaler note_offset(x, 10, 20);
   static Quantize note_tuned(note_offset);
   static NoteToFrequency osc1_frequency(note_tuned, 5, "\3\2\2\3\2");
   static Constant freq_multiplier(1.01);
@@ -705,20 +854,27 @@ void produceStream(short *buffer, int samples)
 
   static Multiply notes(filter, env);
   
+  static Constant delay_dry(0.0f);
   static Constant delay_wet(0.5f);
-  static Constant delay_feedback(0.6f);
-  static Constant delay_speed(1.0f);
-  static Delay output(1.5/3.0, 0.2, notes, delay_wet, delay_feedback, delay_speed);
+  static Constant delay_feedback(0.5f);
+  static StereoDelay pingpong(1.5/3.0, 0.05, notes, delay_wet, delay_dry, delay_feedback);
+  
+  static UnitScaler panpos(x, 0.25, 0.75);
+  static Pan panned_notes(notes, panpos);
+  
+  static StereoAdd output(panned_notes, pingpong);
   
   static float time = 0;  
   const float *o = output.output(time, samples);
   time += 1.0;
   
-  for(int i=0; i<samples; i++)
+  for(int i=0; i<samples*2; i+=2)
   {
+#ifdef __APPLE__
+    *buffer++ = short(o[i]+o[i+1] * 16384);
+#else
     *buffer++ = short(o[i] * 32767);
-#ifndef __APPLE__
-    *buffer++ = short(o[i] * 32767);
+    *buffer++ = short(o[i+1] * 32767);
 #endif
   }
 }
