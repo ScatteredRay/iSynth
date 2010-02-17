@@ -496,7 +496,7 @@ class Overdrive : public Module
 {
   public:
     Overdrive(Module &input, float amount = 2.0f)
-    : m_input(input), m_amount(1.0f - 1.0f/amount)
+    : m_input(input), m_amount(amount)
     {}
     
     void fill(float last_fill, int samples)
@@ -505,9 +505,8 @@ class Overdrive : public Module
       
       for(int i=0; i<samples; i++)
       {
-        float x = input[i];
-        float k = 2*m_amount/(1-m_amount);
-        m_output[i] = (1+k)*x/(1+k*abs(x));
+        float sample = input[i]*m_amount;
+        m_output[i] = tanh(sample);
       }
     }
   
@@ -801,6 +800,33 @@ class UnitScaler : public Module
     float m_range, m_offset;
 };
 
+class Rotate : public StereoModule
+{
+  public:
+    Rotate(StereoModule &input, Module &angle) : m_input(input), m_angle(angle) {}
+    
+    void fill(float last_fill, int samples)
+    {
+      const float *input = m_input.output(last_fill, samples);
+      const float *angle = m_angle.output(last_fill, samples);
+      float *output = m_output;
+      
+      for(int i=0; i<samples; i++)
+      {
+        float left  = *input++;
+        float right = *input++;
+        float cos_mul = cos(angle[i]), sin_mul = sin(angle[i]);
+        *output++ = left*cos_mul + right*sin_mul;
+        *output++ = left*sin_mul + right*cos_mul;
+      }
+      printf("%g, %g\n", cos(angle[0]), sin(angle[0]));
+    }
+
+  private:
+    StereoModule &m_input;
+    Module &m_angle;
+};
+
 class Constant : public Module
 {
   public:
@@ -834,35 +860,44 @@ void produceStream(short *buffer, int samples)
   static Input y(1);
   static Input touch(2);
 
-  static UnitScaler note_offset(x, 10, 20);
+  static UnitScaler note_offset(x, 15, 25);
   static Quantize note_tuned(note_offset);
   static NoteToFrequency osc1_frequency(note_tuned, 5, "\3\2\2\3\2");
-  static Constant freq_multiplier(1.01);
+  static Constant freq_multiplier(1.5);
   static Multiply osc2_frequency(osc1_frequency, freq_multiplier);
 
+  static Constant pw(0.5);
   static Saw osc1(osc1_frequency);
   static Saw osc2(osc2_frequency);
   static Add osc_mix(osc1, osc2);
 
-  static EnvelopeGenerator env(touch, 0.01f, 0.2f, 0.25f, 0.03f);
+  static EnvelopeGenerator env(touch, 0.01f, 0.5f, 0.2f, 0.03f);
+  static EnvelopeGenerator cutoff_env_unit(touch, 0.01, 5, 0, 0.01);
+  static UnitScaler cutoff_env(cutoff_env_unit, 0, 1250);
 
-  static UnitScaler cutoff_y(y, 250, 1500); 
-  static Add cutoff(osc1_frequency, cutoff_y); 
-  
+  static UnitScaler cutoff_y(y, 0.1, 1); 
+  static Multiply cutoff(cutoff_y, cutoff_env);
+
   static Constant filter_resonance(0.9f);
   static Filter filter(osc_mix, cutoff, filter_resonance);
-
-  static Multiply notes(filter, env);
+  filter.log("filter.wav");
+  static Overdrive filter_od(filter, 3);
+  filter_od.log("filter_od.wav");
+  static Multiply notes(filter_od, env);
   
   static Constant delay_dry(0.0f);
   static Constant delay_wet(0.5f);
   static Constant delay_feedback(0.5f);
-  static StereoDelay pingpong(1.5/3.0, 0.05, notes, delay_wet, delay_dry, delay_feedback);
+  static StereoDelay pingpong(1.5/3.0, 0.5, notes, delay_wet, delay_dry, delay_feedback);
+  static Constant lfo_freq(0.1);
+  static Sine lfo_unit(lfo_freq);
+  static UnitScaler lfo(lfo_unit, 0.1, 0.3);
+  static Rotate rotate(pingpong, lfo);
   
   static UnitScaler panpos(x, 0.25, 0.75);
   static Pan panned_notes(notes, panpos);
   
-  static StereoAdd output(panned_notes, pingpong);
+  static StereoAdd output(panned_notes, rotate);
   
   static float time = 0;  
   const float *o = output.output(time, samples);
