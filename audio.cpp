@@ -7,25 +7,18 @@
    reverb trails off.  can't check for that, though, because we're not
    reverbing each channel individually.
    
-   stereo: 
-   should be separate stereo modules.  there'll be some code duplication but
-   not a crazy amount.  conversion between them should be explicit.  i.e. a
-   StereoModule that takes Modules as input, or vice versa.
-   
    Todo:
-   - stereo rotate/expand
    - sample playback (wave reader)
    - sequencer (retriggerable)
    - multiple intonations!  just, meantone, quarter tone, well-tempered, etc.
    - replay output from wave, to find nasty clicks (wave reader)
-   - clipper
-   - hard/soft-limiter
+   - hard clipper   
    - panner
    - rectifier
    - oscillator hardsync
    - oscillator band-limiting
    - slew limiter
-   - switch   
+   - switch?
    - additional filters?  eq?
    - reverb
    - exponential envgen, DADSR, parameterized shape
@@ -37,6 +30,8 @@
    - pan module
    - stereoadd module
    - ping pong delay
+   - stereo rotate
+   - hard/soft-limiter (overdrive)
 */
 
 #include <cstdio>
@@ -495,25 +490,24 @@ class Filter : public Module
 class Overdrive : public Module
 {
   public:
-    Overdrive(Module &input, float amount = 2.0f)
+    Overdrive(Module &input, Module &amount)
     : m_input(input), m_amount(amount)
     {}
     
     void fill(float last_fill, int samples)
     {
-      const float *input = m_input.output(last_fill, samples);
+      const float *input  = m_input .output(last_fill, samples);
+      const float *amount = m_amount.output(last_fill, samples);
       
       for(int i=0; i<samples; i++)
       {
-        float sample = input[i]*m_amount;
+        float sample = input[i]*amount[i];
         m_output[i] = tanh(sample);
       }
     }
   
   private:
-    Module &m_input;
-    
-    float m_amount;
+    Module &m_input, &m_amount;
 };
 
 class Multiply : public Module
@@ -555,7 +549,7 @@ class EnvelopeGenerator : public Module
           if(gate[i] > 0.9)
           {
             m_stage = ATTACK;
-            m_rate = (1-m_position) / (sample_rate*m_attack);
+            m_rate = (1-m_position) / (sample_rate*m_attack+1);
             m_held = true;
           }
         }
@@ -564,7 +558,7 @@ class EnvelopeGenerator : public Module
           if(gate[i] < 0.1)
           {
             m_stage = RELEASE;
-            m_rate = -m_position / (sample_rate*m_release);
+            m_rate = -m_position / (sample_rate*m_release+1);
             m_held = false;
           }
         }
@@ -579,7 +573,7 @@ class EnvelopeGenerator : public Module
             {
               m_stage = DECAY;
               m_position = 1;
-              m_rate = (m_sustain-1) / (sample_rate*m_decay);
+              m_rate = (m_sustain-1) / (sample_rate*m_decay+1);
             }
             break;
           case DECAY:
@@ -819,7 +813,6 @@ class Rotate : public StereoModule
         *output++ = left*cos_mul + right*sin_mul;
         *output++ = left*sin_mul + right*cos_mul;
       }
-      printf("%g, %g\n", cos(angle[0]), sin(angle[0]));
     }
 
   private:
@@ -859,47 +852,62 @@ void produceStream(short *buffer, int samples)
   static Input x(0);
   static Input y(1);
   static Input touch(2);
+  
+  static SampleAndHold initial_x(x, touch);
+  static SampleAndHold initial_y(y, touch);
+  
+  static EnvelopeGenerator vibrato_env(touch, 2, 1, 1, 1);
+  static Constant vibrato_freq(5);
+  static Sine vibrato_lfo(vibrato_freq);
+  static Multiply vibrato_enveloped(vibrato_lfo, vibrato_env);
+  static UnitScaler vibrato_y(y, 0, 1);
+  static Multiply vibrato_unit(vibrato_enveloped, vibrato_y);
+  static UnitScaler vibrato(vibrato_unit, 0.975, 1.025);
 
-  static UnitScaler note_offset(x, 15, 25);
+  static UnitScaler note_offset(x, 21, 35);
   static Quantize note_tuned(note_offset);
-  static NoteToFrequency osc1_frequency(note_tuned, 5, "\3\2\2\3\2");
-  static Constant freq_multiplier(1.5);
-  static Multiply osc2_frequency(osc1_frequency, freq_multiplier);
+  static NoteToFrequency note_freq(note_tuned, 5, "\2\2\1\2\2\1\2");
+  static Multiply osc1_frequency(note_freq, vibrato);
+  static Constant freq_offset(1);
+  static Add osc2_frequency(osc1_frequency, freq_offset);
+  
+  static EnvelopeGenerator pw_env_unit(touch, 1, 1, 0.9, 1);
+  static UnitScaler pw_env(pw_env_unit, 0.5, 0.05);
 
-  static Constant pw(0.5);
-  static Saw osc1(osc1_frequency);
-  static Saw osc2(osc2_frequency);
+  static Pulse osc1(osc1_frequency, pw_env);
+  static Pulse osc2(osc2_frequency, pw_env);
   static Add osc_mix(osc1, osc2);
 
-  static EnvelopeGenerator env(touch, 0.01f, 0.5f, 0.2f, 0.03f);
-  static EnvelopeGenerator cutoff_env_unit(touch, 0.01, 5, 0, 0.01);
-  static UnitScaler cutoff_env(cutoff_env_unit, 0, 1250);
-
-  static UnitScaler cutoff_y(y, 0.1, 1); 
+  static EnvelopeGenerator env(touch, 0.1f, 0.5f, 0.3f, 0.03f);
+  static EnvelopeGenerator cutoff_env_unit(touch, 0.01, 1, 0, 0.01);
+  static UnitScaler cutoff_env(cutoff_env_unit, 750, 2000);
+  
+  static UnitScaler cutoff_y(initial_y, 0.5, 1); 
   static Multiply cutoff(cutoff_y, cutoff_env);
 
-  static Constant filter_resonance(0.9f);
-  static Filter filter(osc_mix, cutoff, filter_resonance);
-  filter.log("filter.wav");
-  static Overdrive filter_od(filter, 3);
-  filter_od.log("filter_od.wav");
-  static Multiply notes(filter_od, env);
+  static Constant filter_resonance(0.7f);
+  static Filter filter(osc_mix, cutoff, filter_resonance);  
+  
+  static Multiply notes(filter, env);
   
   static Constant delay_dry(0.0f);
   static Constant delay_wet(0.5f);
-  static Constant delay_feedback(0.5f);
-  static StereoDelay pingpong(1.5/3.0, 0.5, notes, delay_wet, delay_dry, delay_feedback);
-  static Constant lfo_freq(0.1);
-  static Sine lfo_unit(lfo_freq);
-  static UnitScaler lfo(lfo_unit, 0.1, 0.3);
-  static Rotate rotate(pingpong, lfo);
+  static Constant delay_feedback(0.3f);
+  static StereoDelay pingpong(1.5/3.0, 0.1, notes, delay_wet, delay_dry, delay_feedback);
+  static Constant rotate_lfo_freq(0.1);
+  static Sine rotate_lfo_unit(rotate_lfo_freq);
+  static UnitScaler rotate_lfo(rotate_lfo_unit, 0.1, 0.3);
+  static Rotate rotate(pingpong, rotate_lfo);
   
-  static UnitScaler panpos(x, 0.25, 0.75);
+  static UnitScaler panpos(initial_x, 0.25, 0.75);
   static Pan panned_notes(notes, panpos);
   
   static StereoAdd output(panned_notes, rotate);
   
   static float time = 0;  
+  x.output(time, samples);
+  y.output(time, samples);
+  touch.output(time, samples);
   const float *o = output.output(time, samples);
   time += 1.0;
   
