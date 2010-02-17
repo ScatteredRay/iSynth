@@ -143,6 +143,6 @@ void streamSound(unsigned int buffer_size)
 
 void makeNoise()
 { 
-  setupSound (512);
-  streamSound(512);
+  setupSound (1024);
+  streamSound(1024);
 }

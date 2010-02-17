@@ -1,10 +1,18 @@
+#include <cstdio>
 #include "audio.h"
 #include "input.h"
 
 int main(int argc, char **argv)
 {
-  initInput();
-  makeNoise();
+  try
+  {
+    initInput();
+    makeNoise();
+  }
+  catch(const char *s)
+  {
+    printf("Exception: %s", s);
+  }
 
   return 0;
 }

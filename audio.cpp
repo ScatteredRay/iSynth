@@ -13,7 +13,6 @@
    - multiple intonations!  just, meantone, quarter tone, well-tempered, etc.
    - replay output from wave, to find nasty clicks (wave reader)
    - hard clipper   
-   - panner
    - rectifier
    - oscillator hardsync
    - oscillator band-limiting
@@ -32,6 +31,7 @@
    - ping pong delay
    - stereo rotate
    - hard/soft-limiter (overdrive)
+   - panner
 */
 
 #include <cstdio>
