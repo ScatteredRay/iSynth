@@ -12,6 +12,7 @@ int main(int argc, char **argv)
   catch(const char *s)
   {
     printf("Exception: %s", s);
+    return 1;
   }
 
   return 0;

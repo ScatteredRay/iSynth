@@ -66,7 +66,7 @@ void setupSound(unsigned int buffer_size)
                          0, 0, DSBLOCK_ENTIREBUFFER)))
     throw "couldn't lock dsound buffer";
 
-  produceStream((short *)write_buffer, write_buffer_size/4);
+  memset(write_buffer, 0, write_buffer_size);
 
   if(FAILED(buffer->Unlock(write_buffer, write_buffer_size, 0, 0)))
     throw "couldn't unlock dsound buffer";  
