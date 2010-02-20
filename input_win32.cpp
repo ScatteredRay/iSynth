@@ -59,5 +59,9 @@ void readInputAxis(int axis, float *buffer, int size)
   if(axis==0) value = x;
   if(axis==1) value = y;
   if(axis==2) value = button;
+  
+  if(value < -1) value = -1;
+  if(value >  1) value =  1;
+  
   for(int i=0; i<size; i++) buffer[i] = value;
 }

@@ -12,8 +12,10 @@
    reverbing each channel individually.
    
    Todo:
+   - input range validation
    - support relative bending after touchdown
    - sample playback (wave reader)
+   - text file patch definitions
    - sequencer (retriggerable)
    - multiple intonations!  just, meantone, quarter tone, well-tempered, etc.
    - replay output from wave, to find nasty clicks (wave reader)
@@ -37,6 +39,8 @@
    - stereo rotate
    - hard/soft-limiter (overdrive)
    - panner
+   - output range calculation
+   - rename unitscaler to rescaler; make it scale input range to new range
 */
 
 #include <cfloat>
@@ -156,8 +160,8 @@ class Module
     Module() : m_last_fill(0), m_waveout(0)
     {
       memset(m_output, 0, max_buffer_size*sizeof(float));
-      memset(&m_within_lower_bound, 0xff, sizeof(float));
-      memset(&m_within_upper_bound, 0xff, sizeof(float));
+      //memset(&m_within_lower_bound, 0xff, sizeof(float));
+      //memset(&m_within_upper_bound, 0xff, sizeof(float));
     }
     ~Module()
     {
@@ -213,8 +217,8 @@ class Module
   protected:  
     float m_output[max_buffer_size];
     float m_last_fill;
-    float m_within_lower_bound;
-    float m_within_upper_bound;
+    //float m_within_lower_bound;
+    //float m_within_upper_bound;
     WaveOut *m_waveout;
 };
 
@@ -600,23 +604,23 @@ class Filter : public Module
     float m_y1, m_y2, m_y3, m_y4, m_oldx, m_oldy1, m_oldy2, m_oldy3;
 };
 
-class Overdrive : public Module
+class Limiter : public Module
 {
   public:
-    Overdrive(Module &input, Module &amount)
-    : m_input(input), m_amount(amount)
+    Limiter(Module &input, Module &preamp)
+    : m_input(input), m_preamp(preamp)
     {}
     
-    const char *moduleName() { return "Overdrive"; }
+    const char *moduleName() { return "Limiter"; }
 
     void fill(float last_fill, int samples)
     {
       const float *input  = m_input .output(last_fill, samples);
-      const float *amount = m_amount.output(last_fill, samples);
+      const float *preamp = m_preamp.output(last_fill, samples);
       
       for(int i=0; i<samples; i++)
       {
-        float sample = input[i]*amount[i];
+        float sample = input[i]*preamp[i];
         m_output[i] = tanh(sample);
       }
     }
@@ -627,7 +631,7 @@ class Overdrive : public Module
     }
 
   private:
-    Module &m_input, &m_amount;
+    Module &m_input, &m_preamp;
 };
 
 class Multiply : public Module
@@ -947,13 +951,16 @@ class StereoAdd : public StereoModule
     std::vector<StereoModule *> m_inputs;
 };
 
-class UnitScaler : public Module
+class Rescaler : public Module
 {
   public:
-    UnitScaler(Module &input, float min, float max)
-    : m_input(input), m_range((max-min)/2)
+    Rescaler(Module &input, float to_min, float to_max)
+    : m_input(input), m_to_min(to_min)
     { 
-      m_offset = min+m_range;
+      float from_max;
+      m_input.getOutputRange(&m_from_min, &from_max);
+      m_to_range   = to_max   - to_min;      
+      m_from_range = from_max - m_from_min;
     }
     
     const char *moduleName() { return "Unit Scaler"; }
@@ -961,19 +968,21 @@ class UnitScaler : public Module
     void fill(float last_fill, int samples)
     {
       const float *input = m_input.output(last_fill, samples);      
-      for(int i=0; i<samples; i++) m_output[i] = input[i]*m_range + m_offset;
+      for(int i=0; i<samples; i++)
+        m_output[i] = (input[i]-m_from_min) / m_from_range * m_to_range +
+                      m_to_min;
     }
 
     void getOutputRange(float *out_min, float *out_max)
     {      
-      *out_min = m_offset - m_range;
-      *out_max = m_offset + m_range;
+      *out_min = m_to_min;
+      *out_max = m_to_min + m_to_range;
       if(*out_max < *out_min) swap(*out_max, *out_min);
     }
 
   private:
     Module &m_input;
-    float m_range, m_offset;
+    float m_from_min, m_from_range, m_to_min, m_to_range;
 };
 
 class Rotate : public StereoModule
@@ -1063,11 +1072,11 @@ void produceStream(short *buffer, int samples)
   static Constant vibrato_freq(5);
   static Sine vibrato_lfo(vibrato_freq);
   static Multiply vibrato_enveloped(vibrato_lfo, vibrato_env);
-  static UnitScaler vibrato_y(y, 0, 1);
+  static Rescaler vibrato_y(y, 0, 1);
   static Multiply vibrato_unit(vibrato_enveloped, vibrato_y);
-  static UnitScaler vibrato(vibrato_unit, 0.975, 1.025);
+  static Rescaler vibrato(vibrato_unit, 0.975, 1.025);
 
-  static UnitScaler note_offset(x, 21, 35);
+  static Rescaler note_offset(x, 21, 35);
   static Quantize note_tuned(note_offset);
   static NoteToFrequency note_freq(note_tuned, 5, "\2\2\1\2\2\1\2");
   static Multiply osc1_frequency(note_freq, vibrato);
@@ -1075,7 +1084,7 @@ void produceStream(short *buffer, int samples)
   static Add osc2_frequency(osc1_frequency, freq_offset);
   
   static EnvelopeGenerator pw_env_unit(touch, 1, 1, 0.9, 1);
-  static UnitScaler pw_env(pw_env_unit, 0.5, 0.05); // no!  bad dog!
+  static Rescaler pw_env(pw_env_unit, 0.5, 0.05);
 
   static Pulse osc1(osc1_frequency, pw_env);
   static Pulse osc2(osc2_frequency, pw_env);
@@ -1083,9 +1092,9 @@ void produceStream(short *buffer, int samples)
 
   static EnvelopeGenerator env(touch, 0.1f, 0.5f, 0.3f, 0.03f);
   static EnvelopeGenerator cutoff_env_unit(touch, 0.01, 1, 0, 0.01);
-  static UnitScaler cutoff_env(cutoff_env_unit, 750, 2000); // no!  bad dog!
+  static Rescaler cutoff_env(cutoff_env_unit, 1000, 2000);
   
-  static UnitScaler cutoff_y(initial_y, 0.5, 1); 
+  static Rescaler cutoff_y(initial_y, 0.5, 1); 
   static Multiply cutoff(cutoff_y, cutoff_env);
 
   static Constant filter_resonance(0.7f);
@@ -1099,10 +1108,10 @@ void produceStream(short *buffer, int samples)
   static PingPongDelay pingpong(1.5/3.0, 0.1, notes, delay_wet, delay_dry, delay_feedback);
   static Constant rotate_lfo_freq(0.1);
   static Sine rotate_lfo_unit(rotate_lfo_freq);
-  static UnitScaler rotate_lfo(rotate_lfo_unit, 0.1, 0.3);
+  static Rescaler rotate_lfo(rotate_lfo_unit, 0.1, 0.3);
   static Rotate rotate(pingpong, rotate_lfo);
   
-  static UnitScaler panpos(initial_x, 0.25, 0.75);
+  static Rescaler panpos(initial_x, 0.25, 0.75);
   static Pan panned_notes(notes, panpos);
   
   static StereoAdd output(panned_notes, rotate);
