@@ -7,6 +7,13 @@
 //
 
 #include "audio.h"
+#include "input.h"
+void beginStreamSound();
+void endStreamSound();
+void setupSound();
+
+void inputDown(float down);
+void inputXY(float X, float Y);
 
 #import "isynthViewController.h"
 
@@ -34,7 +41,9 @@
 // Implement viewDidLoad to do additional setup after loading the view, typically from a nib.
 - (void)viewDidLoad {
     [super viewDidLoad];
-    makeNoise();
+	initInput();
+	setupSound();
+	beginStreamSound();
 }
 
 
@@ -53,11 +62,39 @@
 - (void)viewDidUnload {
 	// Release any retained subviews of the main view.
 	// e.g. self.myOutlet = nil;
+	endStreamSound();
 }
 
 
 - (void)dealloc {
     [super dealloc];
+}
+
+- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+	UITouch* Touch = [touches anyObject];
+	CGPoint point = [Touch locationInView:[Touch view]];
+	CGRect bounds = [[Touch view] bounds];
+	
+	
+	inputXY((point.x - bounds.origin.x) / bounds.size.width,
+			(point.y - bounds.origin.y) / bounds.size.height);
+	
+	inputDown(1.0f);
+	
+}
+
+- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+	inputDown(0.0f);
+}
+
+- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+	UITouch* Touch = [touches anyObject];
+	CGPoint point = [Touch locationInView:[Touch view]];
+	CGRect bounds = [[Touch view] bounds];
+	
+	
+	inputXY((point.x - bounds.origin.x) / bounds.size.width,
+			(point.y - bounds.origin.y) / bounds.size.height);
 }
 
 @end

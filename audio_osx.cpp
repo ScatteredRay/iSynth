@@ -31,16 +31,18 @@ OSStatus AudRenderCallback(void* inRefCon,
     return noErr;
 }
 
-void streamSound()
+void beginStreamSound()
 {
     OSStatus err = noErr;
 
     err = AudioOutputUnitStart(gOutputUnit);
     verify(!err);
-    CFRunLoopRun();
-    
-    verify_noerr(AudioOutputUnitStop(gOutputUnit));
+}
 
+void endStreamSound()
+{
+	verify_noerr(AudioOutputUnitStop(gOutputUnit));
+	
     AudioComponentInstanceDispose(gOutputUnit);
 }
 
@@ -111,7 +113,9 @@ void setupSound()
 }
 
 void makeNoise()
-{ 
-  setupSound();
-  streamSound();
+{
+	setupSound();
+	beginStreamSound();
+	CFRunLoopRun();
+	endStreamSound();
 }

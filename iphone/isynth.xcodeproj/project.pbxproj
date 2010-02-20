@@ -19,6 +19,7 @@
 		A9502D71111664C7007CFD97 /* audio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A9502D6F111664C7007CFD97 /* audio.cpp */; };
 		A9502D7C111665E1007CFD97 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9502D7B111665E1007CFD97 /* CoreFoundation.framework */; };
 		A9502DDD11168261007CFD97 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9502DDC11168261007CFD97 /* AudioToolbox.framework */; };
+		A960CA8D1130786C00817886 /* input_osx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A960CA8C1130786C00817886 /* input_osx.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,8 @@
 		A9502D7B111665E1007CFD97 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		A9502DDC11168261007CFD97 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		A9502DE4111682D9007CFD97 /* audio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = audio.h; path = ../audio.h; sourceTree = SOURCE_ROOT; };
+		A960CA8C1130786C00817886 /* input_osx.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = input_osx.cpp; path = ../input_osx.cpp; sourceTree = SOURCE_ROOT; };
+		A960CA8E11307A0500817886 /* input.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = input.h; path = ../input.h; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,6 +95,8 @@
 		29B97315FDCFA39411CA2CEA /* Other Sources */ = {
 			isa = PBXGroup;
 			children = (
+				A960CA8E11307A0500817886 /* input.h */,
+				A960CA8C1130786C00817886 /* input_osx.cpp */,
 				A9502DE4111682D9007CFD97 /* audio.h */,
 				A9502D6E111664C7007CFD97 /* audio_osx.cpp */,
 				A9502D6F111664C7007CFD97 /* audio.cpp */,
@@ -182,6 +187,7 @@
 				28D7ACF80DDB3853001CB0EB /* isynthViewController.mm in Sources */,
 				A9502D70111664C7007CFD97 /* audio_osx.cpp in Sources */,
 				A9502D71111664C7007CFD97 /* audio.cpp in Sources */,
+				A960CA8D1130786C00817886 /* input_osx.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

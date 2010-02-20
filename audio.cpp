@@ -53,6 +53,10 @@
 
 using namespace std;
 
+#ifndef __APPLE__
+#define snprintf _snprintf
+#endif //__APPLE__
+
 #define _CRT_SECURE_NO_WARNINGS
 #pragma warning(disable : 4244) // double literal conversion to float
 #pragma warning(disable : 4305) // double literal conversion to float
@@ -201,7 +205,7 @@ class Module
       if(inp_min < min || inp_max > max)
       {
         static char error[256];
-        _snprintf(error, 255,
+        snprintf(error, 255,
                   "%s predicts invalid range (%g, %g) for %s (%g, %g)",
                   input.moduleName(), inp_min, inp_max, moduleName(), min, max);
         throw error;
@@ -218,7 +222,7 @@ class Module
         {
           static char error[256];
           getOutputRange(&min, &max);
-          _snprintf(error, 255, "%s produced invalid output: %g <= %g <= %g",
+          snprintf(error, 255, "%s produced invalid output: %g <= %g <= %g",
                     moduleName(), min, m_output[i], max);
           throw error;
         }
