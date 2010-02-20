@@ -171,13 +171,13 @@ class Module
     virtual void fill(float last_fill, int samples) = 0;    
     virtual void getOutputRange(float *out_min, float *out_max) = 0;
     virtual const char *moduleName() = 0;
-    //virtual void validateInputRange() = 0;
+    virtual void validateInputRange() = 0;
 
     const float *output(float last_fill, int samples)
     {
       if(m_last_fill < last_fill)
       {
-        //validateInputRange();
+        validateInputRange();
         fill(last_fill, samples);
         m_last_fill = last_fill;
         if(m_waveout) m_waveout->writeBuffer(m_output, samples);
@@ -189,6 +189,25 @@ class Module
       return m_output;
     }
     
+    void log(const string filename, float scaler=32768)
+    {
+      if(!m_waveout) m_waveout = new WaveOut(filename, scaler);
+    }    
+
+    void validateWithin(Module &input, float min, float max)
+    {
+      float inp_min, inp_max;
+      input.getOutputRange(&inp_min, &inp_max);
+      if(inp_min < min || inp_max > max)
+      {
+        static char error[256];
+        _snprintf(error, 255,
+                  "%s predicts invalid range (%g, %g) for %s (%g, %g)",
+                  input.moduleName(), inp_min, inp_max, moduleName(), min, max);
+        throw error;
+      }
+    }
+
     void validateOutputRange(float *buffer, int samples)
     {
       float min, max;
@@ -199,20 +218,16 @@ class Module
         {
           static char error[256];
           getOutputRange(&min, &max);
-          _snprintf(error, 255, "%s produced invalid output: %g <= %g <= %g", moduleName(), min, m_output[i], max);
-          throw moduleName();
+          _snprintf(error, 255, "%s produced invalid output: %g <= %g <= %g",
+                    moduleName(), min, m_output[i], max);
+          throw error;
         }
 /*        float upper_bound_distance = abs(max-m_output[i]);
         float lower_bound_distance = abs(min-m_output[i]);
         if(_isnan(m_within_upper_bound) || upper_bound_distance<m_within_upper_bound) m_within_upper_bound = upper_bound_distance;
         if(_isnan(m_within_lower_bound) || lower_bound_distance<m_within_lower_bound) m_within_lower_bound = lower_bound_distance; */
       }
-    }
-        
-    void log(const string filename, float scaler=32768)
-    {
-      if(!m_waveout) m_waveout = new WaveOut(filename, scaler);
-    }    
+    }        
   
   protected:  
     float m_output[max_buffer_size];
@@ -263,6 +278,11 @@ class Oscillator : public Module
     {
       *out_min = -1;
       *out_max =  1;      
+    }
+    
+    void validateInputRange()
+    {
+      validateWithin(m_frequency, 0, 22050);
     }
     
   protected:
@@ -417,6 +437,11 @@ class SampleAndHold : public Module
     {
       m_source.getOutputRange(out_min, out_max);
     }
+    
+    void validateInputRange()
+    {
+      validateWithin(m_trigger, 0, 1);
+    }
 
   private:
     Module &m_source, &m_trigger;
@@ -445,6 +470,8 @@ class Quantize : public Module
       *out_max = floor(*out_max + 0.5);
     }
 
+    void validateInputRange() {} // don't care
+
   private:
     Module &m_input;
 };
@@ -464,35 +491,41 @@ class NoteToFrequency : public Module
     {
       int note = key;
       const char *scalepos = scale;
-      for(int i=0; i<128; i++)
+      for(int i=0; i<128 && note<128; i++)
       {
-        notes[i] = note;
+        m_notes[i] = note;
+        m_max_note = i;
         note += *scalepos++;
-        if(*scalepos == 0) scalepos = scale;
+        if(*scalepos == 0) scalepos = scale;        
       }
+    }
+    
+    float freqFromNote(float note)
+    {
+      return pow(2.0, m_notes[int(note)]/12.0) * note_0;
     }
         
     void fill(float last_fill, int samples)
     {
       const float *input = m_input.output(last_fill, samples);
       for(int i=0; i<samples; i++)
-      {
-        int scaledegree = input[i];
-        if(scaledegree > 127) scaledegree = 127;
-        if(scaledegree < 0  ) scaledegree = 0;
-        int note = notes[scaledegree];
-        m_output[i] = pow(2.0, note/12.0) * note_0;
-      }
+        m_output[i] = freqFromNote(input[i]);
     }
     
     void getOutputRange(float *out_min, float *out_max)
     {
-      *out_min = 1, *out_max = 22050; // maybe?  we can do the math.
+      *out_min = freqFromNote(1), *out_max = freqFromNote(m_max_note);
+    }
+
+    void validateInputRange()
+    {
+      validateWithin(m_input, 0, m_max_note);
     }
 
   private:
     Module &m_input;
-    int notes[128];
+    int m_max_note;
+    int m_notes[128];
 };
 
 class Add : public Module
@@ -513,7 +546,8 @@ class Add : public Module
     {
       if(m_inputs.size() == 0) return;
       
-      memcpy(m_output, m_inputs[0]->output(last_fill, samples), samples * sizeof(float));
+      memcpy(m_output, m_inputs[0]->output(last_fill, samples),
+             samples * sizeof(float));
       for(unsigned int i=1; i<m_inputs.size(); i++)
       {
         const float *input = m_inputs[i]->output(last_fill, samples);
@@ -533,6 +567,8 @@ class Add : public Module
         *out_max += inp_max;
       }       
     }
+
+    void validateInputRange() {} // don't care
 
   private:
     std::vector<Module *> m_inputs;
@@ -597,6 +633,12 @@ class Filter : public Module
       m_input.getOutputRange(out_min, out_max); // maybe?  this math is hard.
     }
 
+    void validateInputRange()
+    {
+      validateWithin(m_cutoff, 0, 22050);
+      validateWithin(m_resonance, 0, 1);
+    }
+
   private:
     Module &m_input, &m_cutoff, &m_resonance;
     float m_oldcutoff, m_oldresonance;
@@ -630,6 +672,11 @@ class Limiter : public Module
       *out_min = -1, *out_max = 1;
     }
 
+    void validateInputRange()
+    {
+      validateWithin(m_preamp, 1, 10);
+    }
+
   private:
     Module &m_input, &m_preamp;
 };
@@ -656,6 +703,8 @@ class Multiply : public Module
       *out_min = min(min(a_min*b_max, b_min*a_max), a_min*b_min);
       *out_max = a_max*b_max;
     }
+
+    void validateInputRange() {} // don't care
 
   private:
     Module &m_a, &m_b;
@@ -739,6 +788,11 @@ class EnvelopeGenerator : public Module
     {      
       *out_min = 0, *out_max = 1;
     }
+   
+    void validateInputRange()
+    {
+      validateWithin(m_gate, 0, 1);
+    }
 
   private:   
     float m_position, m_rate;
@@ -748,8 +802,6 @@ class EnvelopeGenerator : public Module
     Module &m_gate;
     float m_attack, m_decay, m_sustain, m_release;    
 };
-
-
 
 class PingPongDelay : public StereoModule
 {
@@ -789,7 +841,8 @@ class PingPongDelay : public StereoModule
         float left_sample = m_buffer_left[m_read_pos]*m_filter +
                             m_last_sample_left*(1-m_filter);
         m_last_sample_left = left_sample;
-        m_buffer_left[m_write_pos] = input[i] + m_buffer_right[m_read_pos] * feedback[i];
+        m_buffer_left[m_write_pos] = input[i] +
+                                     m_buffer_right[m_read_pos] * feedback[i];
         *output++ = input[i]*dry[i] + left_sample*wet[i];
         
         float right_sample = m_buffer_right[m_read_pos]*m_filter +
@@ -805,7 +858,14 @@ class PingPongDelay : public StereoModule
 
     void getOutputRange(float *out_min, float *out_max)
     {      
-      m_input.getOutputRange(out_min, out_max); // maybe?
+      m_input.getOutputRange(out_min, out_max); // wrong for extreme settings
+    }
+
+    void validateInputRange()
+    {
+      validateWithin(m_wet,      0, 1);
+      validateWithin(m_dry,      0, 1);
+      validateWithin(m_feedback, 0, 1);
     }
 
   private:
@@ -851,7 +911,8 @@ class Delay : public Module
       
       for(int i=0; i<samples; i++)
       { 
-        float sample = m_buffer[int(floor(m_read_pos))]*m_filter + m_last_sample*(1-m_filter);
+        float sample = m_buffer[int(floor(m_read_pos))]*m_filter +
+                       m_last_sample*(1-m_filter);
         m_last_sample = sample;
         m_output[i] = input[i]*dry[i] + sample * wet[i];
         m_buffer[m_write_pos] = input[i] + sample * feedback[i];
@@ -863,7 +924,15 @@ class Delay : public Module
   
     void getOutputRange(float *out_min, float *out_max)
     {      
-      m_input.getOutputRange(out_min, out_max); // maybe?
+      m_input.getOutputRange(out_min, out_max); // wrong for extreme settings
+    }
+
+    void validateInputRange()
+    {
+      validateWithin(m_wet,      0, 1);
+      validateWithin(m_dry,      0, 1);
+      validateWithin(m_feedback, 0, 1);
+      validateWithin(m_speed,    0, 2);
     }
 
   private:
@@ -903,6 +972,11 @@ class Pan : public StereoModule
     {      
       m_input.getOutputRange(out_min, out_max);
     }
+    
+    void validateInputRange()
+    {
+      validateWithin(m_position, 0, 1);
+    }
 
   private:
     Module &m_input, &m_position;  
@@ -926,7 +1000,8 @@ class StereoAdd : public StereoModule
     {
       if(m_inputs.size() == 0) return;
       
-      memcpy(m_output, m_inputs[0]->output(last_fill, samples), samples * sizeof(float) * 2);
+      memcpy(m_output, m_inputs[0]->output(last_fill, samples),
+             samples * sizeof(float) * 2);
       for(unsigned int i=1; i<m_inputs.size(); i++)
       {
         const float *input = m_inputs[i]->output(last_fill, samples);
@@ -946,6 +1021,8 @@ class StereoAdd : public StereoModule
         *out_max += inp_max;
       }       
     }
+
+    void validateInputRange() {} // don't care
 
   private:
     std::vector<StereoModule *> m_inputs;
@@ -980,6 +1057,8 @@ class Rescaler : public Module
       if(*out_max < *out_min) swap(*out_max, *out_min);
     }
 
+    void validateInputRange() {} // don't care
+
   private:
     Module &m_input;
     float m_from_min, m_from_range, m_to_min, m_to_range;
@@ -988,7 +1067,9 @@ class Rescaler : public Module
 class Rotate : public StereoModule
 {
   public:
-    Rotate(StereoModule &input, Module &angle) : m_input(input), m_angle(angle) {}
+    Rotate(StereoModule &input, Module &angle)
+    : m_input(input), m_angle(angle)
+    {}
     
     const char *moduleName() { return "Rotate"; }
 
@@ -1013,6 +1094,8 @@ class Rotate : public StereoModule
       m_input.getOutputRange(out_min, out_max);
     }
 
+    void validateInputRange() {} // don't care
+
    private:
     StereoModule &m_input;
     Module &m_angle;
@@ -1032,6 +1115,8 @@ class Constant : public Module
       for(int i=0; i<max_buffer_size; i++) m_output[i] = value;
     }
  
+    void validateInputRange() {} // no input
+
     void getOutputRange(float *out_min, float *out_max)
     {      
       *out_min = *out_max = m_output[0];
@@ -1052,8 +1137,11 @@ class Input : public Module
   
     void getOutputRange(float *out_min, float *out_max)
     {      
-      *out_min = -1, *out_max = 1;
+      *out_min = (m_axis==2)?0:-1;
+      *out_max = 1;
     }
+
+    void validateInputRange() {} // no input
 
   private:
     int m_axis;
@@ -1105,13 +1193,14 @@ void produceStream(short *buffer, int samples)
   static Constant delay_dry(0.0f);
   static Constant delay_wet(0.5f);
   static Constant delay_feedback(0.3f);
-  static PingPongDelay pingpong(1.5/3.0, 0.1, notes, delay_wet, delay_dry, delay_feedback);
+  static PingPongDelay pingpong(1.5/3.0, 0.1, notes, delay_wet, delay_dry,
+                                delay_feedback);
   static Constant rotate_lfo_freq(0.1);
   static Sine rotate_lfo_unit(rotate_lfo_freq);
   static Rescaler rotate_lfo(rotate_lfo_unit, 0.1, 0.3);
   static Rotate rotate(pingpong, rotate_lfo);
   
-  static Rescaler panpos(initial_x, 0.25, 0.75);
+  static Rescaler panpos(initial_x, 0.15, 0.85);
   static Pan panned_notes(notes, panpos);
   
   static StereoAdd output(panned_notes, rotate);
