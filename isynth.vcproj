@@ -184,20 +184,16 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\audio.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\audio.h"
-				>
-			</File>
-			<File
 				RelativePath=".\audio_win32.cpp"
 				>
-			</File>
-			<File
-				RelativePath=".\input.h"
-				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						GeneratePreprocessedFile="0"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath=".\input_win32.cpp"
@@ -207,18 +203,68 @@
 				RelativePath=".\main.cpp"
 				>
 			</File>
+			<File
+				RelativePath=".\moduleprocess.py"
+				>
+			</File>
+			<File
+				RelativePath=".\modules.pre"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
+						CommandLine="python moduleprocess.py &lt; modules.pre &gt; modules_generated.cpp"
+						AdditionalDependencies="moduleprocess.py"
+						Outputs="modules.cpp"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
+						CommandLine="python moduleprocess.py &lt; modules.pre &gt; modules_generated.cpp"
+						AdditionalDependencies="moduleprocess.py"
+						Outputs="modules.cpp"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\synth.cpp"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						GeneratePreprocessedFile="0"
+					/>
+				</FileConfiguration>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
-		</Filter>
-		<Filter
-			Name="Resource Files"
-			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav"
-			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
-			>
+			<File
+				RelativePath=".\audio.h"
+				>
+			</File>
+			<File
+				RelativePath=".\exception.h"
+				>
+			</File>
+			<File
+				RelativePath=".\input.h"
+				>
+			</File>
+			<File
+				RelativePath=".\synth.h"
+				>
+			</File>
 		</Filter>
 	</Files>
 	<Globals>

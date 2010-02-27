@@ -1,5 +1,6 @@
 #include <cstdio>
 #include "audio.h"
+#include "exception.h"
 #include "input.h"
 
 int main(int argc, char **argv)
@@ -9,9 +10,9 @@ int main(int argc, char **argv)
     initInput();
     makeNoise();
   }
-  catch(const char *s)
+  catch(Exception &e)
   {
-    printf("Exception: %s", s);
+    printf("%s", e.describe().c_str());
     return 1;
   }
 
