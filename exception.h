@@ -58,7 +58,7 @@ class Exception
       name(std::string data) : data(data) {};         \
       virtual std::string describe()                  \
       {                                               \
-        return std::string(desc) + data;              \
+        return std::string(desc) + ": " + data;       \
       }                                               \
       std::string data;                               \
   };

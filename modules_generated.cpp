@@ -696,6 +696,25 @@ class NoteToFrequency : public Module
     NoteToFrequency(vector<ModuleParam *> parameters)
     {
       m_input = parameters[0]->m_module;
+      m_scale_name = parameters[1]->m_string;
+      m_scale = 0;
+      m_closest_notes = new char[128];
+      for(int i=0; scales[i].name; i++)
+        if(m_scale_name == scales[i].name)
+          m_scale = (char *)(scales[i].steps);
+      if(m_scale == 0)
+        throw ModuleExcept(string("Unknown scale: ")+m_scale_name);
+      for(int note=0; note<128; note++)
+      {
+        int closest = -128;
+        int step = 0;
+        for(int trying=0; trying<128; trying+=m_scale[step])
+        {
+          if(m_scale[++step] == 0) step = 0;
+          if(abs(trying-note) < abs(closest-note)) closest = trying;
+        }
+        m_closest_notes[note] = closest;
+      }
 
     }
     static Module *create(vector<ModuleParam *> parameters)
@@ -704,9 +723,10 @@ class NoteToFrequency : public Module
     }
 
     const char *moduleName() { return "NoteToFrequency"; }
+    ~NoteToFrequency() { delete[] m_closest_notes; }
     float freqFromNote(float note)
     {
-      return pow(2.0, int(note)/12.0) * note_0;
+      return pow(2.0, m_closest_notes[int(note)]/12.0) * note_0;
     }
 
     
@@ -732,6 +752,9 @@ class NoteToFrequency : public Module
     }
   private:
     Module *m_input;
+    string m_scale_name;
+    char* m_scale;
+    char* m_closest_notes;
 };
 
 
@@ -917,58 +940,6 @@ class PingPongDelay : public StereoModule
 };
 
 /*
-class NoteToFrequency : public Module
-{
-  public:
-    NoteToFrequency(Module &input, int key, const char *scale)
-    : m_input(input)
-    {
-      setScale(key, scale);
-    }
-
-    const char *moduleName() { return "Note-to-Frequency"; }
-
-    void setScale(int key, const char *scale)
-    {
-      int note = key;
-      const char *scalepos = scale;
-      for(int i=0; i<128 && note<128; i++)
-      {
-        m_notes[i] = note;
-        m_max_note = i;
-        note += *scalepos++;
-        if(*scalepos == 0) scalepos = scale;
-      }
-    }
-
-    float freqFromNote(float note)
-    {
-      return pow(2.0, m_notes[int(note)]/12.0) * note_0;
-    }
-
-    void fill(float last_fill, int samples)
-    {
-      const float *input = m_input.output(last_fill, samples);
-      for(int i=0; i<samples; i++)
-        m_output[i] = freqFromNote(input[i]);
-    }
-
-    void getOutputRange(float *out_min, float *out_max)
-    {
-      *out_min = freqFromNote(1), *out_max = freqFromNote(m_max_note);
-    }
-
-    void validateInputRange()
-    {
-      validateWithin(m_input, 0, m_max_note);
-    }
-
-  private:
-    Module &m_input;
-    int m_max_note;
-    int m_notes[128];
-};
-
 class Add : public Module
 {
   public:
@@ -1015,7 +986,6 @@ class Add : public Module
     std::vector<Module *> m_inputs;
 };
 
-
 class Limiter : public Module
 {
   public:
@@ -1050,82 +1020,6 @@ class Limiter : public Module
   private:
     Module &m_input, &m_preamp;
 };
-
-class PingPongDelay : public StereoModule
-{
-  public:
-    PingPongDelay(float length, float filter, Module &input, Module &wet,
-                Module &dry, Module &feedback)
-    : m_buffer_left (new float[int(length*sample_rate)]),
-      m_buffer_right(new float[int(length*sample_rate)]),
-      m_length(int(length*sample_rate)), m_filter(filter),
-      m_input(input), m_wet(wet), m_dry(dry), m_feedback(feedback),
-      m_read_pos(1), m_write_pos(0),
-      m_last_sample_left(0), m_last_sample_right(0)
-    {
-      memset(m_buffer_left,  0, m_length*sizeof(float));
-      memset(m_buffer_right, 0, m_length*sizeof(float));
-    }
-
-    ~PingPongDelay()
-    {
-      delete[] m_buffer_left;
-      delete[] m_buffer_right;
-    }
-
-    const char *moduleName() { return "Ping Pong Delay"; }
-
-    void fill(float last_fill, int samples)
-    {
-      const float *input    = m_input   .output(last_fill, samples);
-      const float *wet      = m_wet     .output(last_fill, samples);
-      const float *dry      = m_dry     .output(last_fill, samples);
-      const float *feedback = m_feedback.output(last_fill, samples);
-
-      float *output = m_output;
-
-      for(int i=0; i<samples; i++)
-      {
-        float left_sample = m_buffer_left[m_read_pos]*m_filter +
-                            m_last_sample_left*(1-m_filter);
-        m_last_sample_left = left_sample;
-        m_buffer_left[m_write_pos] = input[i] +
-                                     m_buffer_right[m_read_pos] * feedback[i];
-        *output++ = input[i]*dry[i] + left_sample*wet[i];
-
-        float right_sample = m_buffer_right[m_read_pos]*m_filter +
-                            m_last_sample_right*(1-m_filter);
-        m_last_sample_right = right_sample;
-        m_buffer_right[m_write_pos] = m_buffer_left[m_read_pos] * feedback[i];
-        *output++ = input[i]*dry[i] + right_sample*wet[i];
-
-        if(++m_write_pos >= m_length) m_write_pos -= m_length;
-        if(++m_read_pos  >= m_length) m_read_pos  -= m_length;
-      }
-    }
-
-    void getOutputRange(float *out_min, float *out_max)
-    {
-      m_input.getOutputRange(out_min, out_max); // wrong for extreme settings
-    }
-
-    void validateInputRange()
-    {
-      validateWithin(m_wet,      0, 1);
-      validateWithin(m_dry,      0, 1);
-      validateWithin(m_feedback, 0, 1);
-    }
-
-  private:
-    float *m_buffer_left, *m_buffer_right;
-    int m_length;
-    float m_filter;
-    int m_read_pos, m_write_pos;
-    float m_last_sample_left, m_last_sample_right;
-
-    Module &m_input, &m_wet, &m_dry, &m_feedback;
-};
-
 // maybe support sweeping the length too?  i bet that would sound awesome
 // speed parameter currently unimplemented
 class Delay : public Module
@@ -1192,52 +1086,6 @@ class Delay : public Module
     int m_write_pos;
 
     Module &m_input, &m_wet, &m_dry, &m_feedback, &m_speed;
-};
-
-class StereoAdd : public StereoModule
-{
-  public:
-    StereoAdd() {}
-    StereoAdd(StereoModule &a, StereoModule &b)
-    {
-      addInput(a);
-      addInput(b);
-    }
-
-    const char *moduleName() { return "Stereo Add"; }
-
-    void addInput(StereoModule &input) { m_inputs.push_back(&input); }
-
-    void fill(float last_fill, int samples)
-    {
-      if(m_inputs.size() == 0) return;
-
-      memcpy(m_output, m_inputs[0]->output(last_fill, samples),
-             samples * sizeof(float) * 2);
-      for(unsigned int i=1; i<m_inputs.size(); i++)
-      {
-        const float *input = m_inputs[i]->output(last_fill, samples);
-        for(int j=0; j<samples*2; j++)
-          m_output[j] += input[j];
-      }
-    }
-
-    void getOutputRange(float *out_min, float *out_max)
-    {
-      *out_min = 0, *out_max = 0;
-      for(unsigned int i=1; i<m_inputs.size(); i++)
-      {
-        float inp_min, inp_max;
-        m_inputs[i]->getOutputRange(&inp_min, &inp_max);
-        *out_min += inp_min;
-        *out_max += inp_max;
-      }
-    }
-
-    void validateInputRange() {} // don't care
-
-  private:
-    std::vector<StereoModule *> m_inputs;
 };
 
 class Rotate : public StereoModule
@@ -1317,6 +1165,7 @@ void fillModuleList()
   g_module_infos["SampleAndHold"]->addParameter("trigger", "Module");
   g_module_infos["NoteToFrequency"] = new ModuleInfo("NoteToFrequency", NoteToFrequency::create);
   g_module_infos["NoteToFrequency"]->addParameter("input", "Module");
+  g_module_infos["NoteToFrequency"]->addParameter("scale_name", "string");
   g_module_infos["Pan"] = new ModuleInfo("Pan", Pan::create);
   g_module_infos["Pan"]->addParameter("input", "Module");
   g_module_infos["Pan"]->addParameter("position", "Module");

@@ -148,6 +148,8 @@
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
+				OptimizeForWindows98="1"
+				LinkTimeCodeGeneration="1"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
 				TargetMachine="1"
@@ -215,7 +217,7 @@
 					>
 					<Tool
 						Name="VCCustomBuildTool"
-						CommandLine="python moduleprocess.py &lt; modules.pre &gt; modules_generated.cpp"
+						CommandLine="python moduleprocess.py &lt; modules.pre &gt; modules_generated.cpp&#x0D;&#x0A;"
 						AdditionalDependencies="moduleprocess.py"
 						Outputs="modules.cpp"
 					/>
@@ -225,7 +227,7 @@
 					>
 					<Tool
 						Name="VCCustomBuildTool"
-						CommandLine="python moduleprocess.py &lt; modules.pre &gt; modules_generated.cpp"
+						CommandLine="python moduleprocess.py &lt; modules.pre &gt; modules_generated.cpp&#x0D;&#x0A;"
 						AdditionalDependencies="moduleprocess.py"
 						Outputs="modules.cpp"
 					/>

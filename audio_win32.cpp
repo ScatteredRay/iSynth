@@ -6,6 +6,7 @@
 #include <dxerr.h>
 
 #include "exception.h"
+#include "input.h"
 #include "synth.h"
 
 IDirectSoundBuffer *buffer;
@@ -87,6 +88,8 @@ void streamSound(unsigned int buffer_size)
   
   for(;;)
   {
+    if(getKey() == 27) return;
+    
     DWORD event = MsgWaitForMultipleObjects(1, &notification_event, false,
                                             INFINITE,  QS_ALLEVENTS);
     if(event == WAIT_OBJECT_0) // time to stream more audio

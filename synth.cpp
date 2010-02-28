@@ -1,4 +1,7 @@
-/* multiplex modules: must take at least one vectors of buffers in, maintains
+/* hey hey hey -- better idea than just polyphony for multitouch; additional fingers
+   provide additional axes of input!  e.g. x, y, touch, angle, distance?
+
+   multiplex modules: must take at least one vectors of buffers in, maintains
    multiple channels for output, but can mixdown if a mono module requests.
 
    what has to be multiplexed?
@@ -43,6 +46,9 @@
    - output range calculation
    - rename unitscaler to rescaler; make it scale input range to new range
    - input range validation
+   - module definition preprocessor
+   - read patches from text file
+   - escape to quit
 */
 #include "synth.h"
 
@@ -89,14 +95,14 @@ struct
   { "mixolydian", "\2\2\1\2\2\1\2" },
   { "locrian",    "\1\2\2\1\2\2\2" },
   { "pentatonic", "\2\2\3\2\3" },
-  { "pent minor", "\3\2\2\3\2" },
+  { "pentminor",  "\3\2\2\3\2" },
   { "chromatic",  "\1" },
   { "whole",      "\2" },
-  { "minor 3rd",  "\3" },
+  { "minor3rd",   "\3" },
   { "3rd",        "\4" },
-  { "4ths",       "\5" },
+  { "4th",        "\5" },
   { "tritone",    "\6" },
-  { "5ths",       "\7" },
+  { "5th",        "\7" },
   { "octave",     "\12" },
   { 0,            0 }
 };
@@ -288,13 +294,13 @@ class StereoModule : public Module
     float m_output[max_buffer_size*2];
 };
 
-union ModuleParam
+struct ModuleParam
 {
   Module       *m_module;
   StereoModule *m_stereomodule;
   float         m_float;
   int           m_int;
-  char         *m_string;
+  string        m_string;
 };
 
 class Constant : public Module
@@ -384,6 +390,8 @@ class ModuleInfo
 
 map<string, ModuleInfo *> g_module_infos;
 
+EXCEPTION_D(ModuleExcept, Exception, "Module exception")
+
 #include "modules_generated.cpp"
 
 map<string, Module *> g_modules;
@@ -392,11 +400,14 @@ EXCEPTION_D(UnknownModuleTypeExcept, ParseExcept, "Unknown module type")
 EXCEPTION_D(ExpectingFloatExcept, ParseExcept, "Expecting a float")
 EXCEPTION_D(ExpectingIntExcept, ParseExcept, "Expecting an int")
 EXCEPTION_D(ExpectingModuleExcept, ParseExcept, "Expecting module name")
+EXCEPTION_D(ExpectingStringExcept, ParseExcept, "Expecting string")
+EXCEPTION_D(BadStringExcept, ParseExcept, "Bad string (no ,() or whitespace)")
 EXCEPTION_D(UnknownModuleExcept, ParseExcept, "Unknown module instance")
-EXCEPTION_D(UnknownTypeExcept, ParseExcept, "Unknown type")
+EXCEPTION_D(UnknownTypeExcept, ParseExcept, "Unknown parameter type")
 EXCEPTION_D(NotStereoExcept, ParseExcept, "Module not stereo")
 EXCEPTION_D(NotMonoExcept, ParseExcept, "Module not mono")
 EXCEPTION_D(TooFewParamsExcept, ParseExcept, "Too few parameters")
+EXCEPTION_D(TooManyParamsExcept_D, ParseExcept, "Too many parameters")
 
 Module *addModule(char *definition)
 {
@@ -416,7 +427,15 @@ Module *addModule(char *definition)
       continue;
     }
     if(name == "") { name = t; continue; }
-    string param_type = g_module_infos[type]->parameter(params.size()).second;
+    string param_type;
+    try
+    {
+      param_type = g_module_infos[type]->parameter(params.size()).second;
+    }
+    catch(TooManyParamsExcept)
+    {
+      throw TooManyParamsExcept_D(def_copy);    
+    }
     ModuleParam *m = new ModuleParam();
     if(param_type=="float")
     {
@@ -449,18 +468,22 @@ Module *addModule(char *definition)
         if(!g_modules.count(t)) throw UnknownModuleExcept(def_copy+t);
         if(!g_modules[t]->stereo())
           throw NotStereoExcept(def_copy + t);
-        m->m_module = g_modules[t];
+        m->m_stereomodule = (StereoModule *)g_modules[t];
       } 
     }
-    /*else if(param_type=="string")
+    else if(param_type=="string")
     {
-      throw "unimplemented";
-    }*/
-    else throw UnknownTypeExcept(def_copy+type);
+      if(*t != '"') throw ExpectingStringExcept(def_copy+t);
+      char *end = strchr(t+1, '"');
+      if(!end) throw BadStringExcept(def_copy+t);
+      *end = 0;
+      m->m_string = t+1;
+    }
+    else throw UnknownTypeExcept(def_copy+t);
     params.push_back(m);
   } while(t = strtok(0, delim));
   if(params.size() != g_module_infos[type]->parameterCount())
-    throw TooFewParamsExcept(def_copy+t);
+    throw TooFewParamsExcept(def_copy);
   g_modules[name] = g_module_infos[type]->instantiate(params);
   
   return g_modules[name];
