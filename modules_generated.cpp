@@ -690,6 +690,50 @@ class SampleAndHold : public Module
 };
 
 
+class Limiter : public Module
+{
+  public:
+    Limiter(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_module;
+      m_preamp = parameters[1]->m_module;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new Limiter(parameters);
+    }
+
+    const char *moduleName() { return "Limiter"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+      const float *preamp = m_preamp->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = tanh(input[i] * preamp[i]);
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      *out_min = -1, *out_max = 1;
+    }
+
+    void validateInputRange()
+    {
+      validateWithin(*m_preamp, 1, 10);
+    }
+  private:
+    Module *m_input;
+    Module *m_preamp;
+};
+
+
 class NoteToFrequency : public Module
 {
   public:
@@ -986,40 +1030,6 @@ class Add : public Module
     std::vector<Module *> m_inputs;
 };
 
-class Limiter : public Module
-{
-  public:
-    Limiter(Module &input, Module &preamp)
-    : m_input(input), m_preamp(preamp)
-    {}
-
-    const char *moduleName() { return "Limiter"; }
-
-    void fill(float last_fill, int samples)
-    {
-      const float *input  = m_input .output(last_fill, samples);
-      const float *preamp = m_preamp.output(last_fill, samples);
-
-      for(int i=0; i<samples; i++)
-      {
-        float sample = input[i]*preamp[i];
-        m_output[i] = tanh(sample);
-      }
-    }
-
-    void getOutputRange(float *out_min, float *out_max)
-    {
-      *out_min = -1, *out_max = 1;
-    }
-
-    void validateInputRange()
-    {
-      validateWithin(m_preamp, 1, 10);
-    }
-
-  private:
-    Module &m_input, &m_preamp;
-};
 // maybe support sweeping the length too?  i bet that would sound awesome
 // speed parameter currently unimplemented
 class Delay : public Module
@@ -1163,6 +1173,9 @@ void fillModuleList()
   g_module_infos["SampleAndHold"] = new ModuleInfo("SampleAndHold", SampleAndHold::create);
   g_module_infos["SampleAndHold"]->addParameter("source", "Module");
   g_module_infos["SampleAndHold"]->addParameter("trigger", "Module");
+  g_module_infos["Limiter"] = new ModuleInfo("Limiter", Limiter::create);
+  g_module_infos["Limiter"]->addParameter("input", "Module");
+  g_module_infos["Limiter"]->addParameter("preamp", "Module");
   g_module_infos["NoteToFrequency"] = new ModuleInfo("NoteToFrequency", NoteToFrequency::create);
   g_module_infos["NoteToFrequency"]->addParameter("input", "Module");
   g_module_infos["NoteToFrequency"]->addParameter("scale_name", "string");

@@ -16,22 +16,20 @@
    reverbing each channel individually.
 
    Todo:
+   - rectifier, clipper, slew limiter, switch
+   - support for arbitrary parameter count
+     | sequencer (retriggerable)
+     \- oscillator hard sync
    - support relative bending after touchdown
    - sample playback (wave reader)
    - text file patch definitions
-   - sequencer (retriggerable)
    - multiple intonations!  just, meantone, quarter tone, well-tempered, etc.
    - replay output from wave, to find nasty clicks (wave reader)
-   - hard clipper
-   - rectifier
-   - oscillator hardsync
    - oscillator band-limiting (http://www.fly.net/~ant/bl-synth/ ?)
-   - slew limiter
-   - switch?
    - additional filters?  eq?
    - reverb
    - exponential envgen, DADSR, parameterized shape
-   - multiplexing subsystem
+   - multiplexing subsystem?
    Done:
    - x/y input
    - scale quantizer -- actually, "scale" should be a parameter of
@@ -49,6 +47,9 @@
    - module definition preprocessor
    - read patches from text file
    - escape to quit
+   - patch selection from command line
+   - output logging from command line
+   - limiter
 */
 #include "synth.h"
 
@@ -214,9 +215,12 @@ class Module
       return m_output;
     }
 
-    virtual void log(const string filename, float scaler=32768)
+    virtual void log(const string filename)
     {
-      if(!m_waveout) m_waveout = new WaveOut(filename, scaler);
+      float min, max;
+      getOutputRange(&min, &max);
+      if(-min > max) max = -min;
+      if(!m_waveout) m_waveout = new WaveOut(filename, 32767/max);
     }
 
     void validateWithin(Module &input, float min, float max)
@@ -285,9 +289,12 @@ class StereoModule : public Module
       return m_output;
     }
 
-    void log(const string filename, float scaler=32768)
+    void log(const string filename)
     {
-      if(!m_waveout) m_waveout = new WaveOut(filename, scaler, true);
+      float min, max;
+      getOutputRange(&min, &max);
+      if(-min > max) max = -min;
+      if(!m_waveout) m_waveout = new WaveOut(filename, 32767/max, true);
     }
 
   protected:
@@ -409,12 +416,16 @@ EXCEPTION_D(NotMonoExcept, ParseExcept, "Module not mono")
 EXCEPTION_D(TooFewParamsExcept, ParseExcept, "Too few parameters")
 EXCEPTION_D(TooManyParamsExcept_D, ParseExcept, "Too many parameters")
 
-Module *addModule(char *definition)
+void addModule(char *definition)
 {
   string def_copy = definition;
 
   const char *delim = ",() \r\n\t";
+  char *comment = strchr(definition, '#');
+  if(comment) *comment = 0;
   char *t = strtok(definition, delim);
+  if(!t) return;
+  
   string name = "", type = "";
   vector<ModuleParam *> params;
   do
@@ -485,34 +496,63 @@ Module *addModule(char *definition)
   if(params.size() != g_module_infos[type]->parameterCount())
     throw TooFewParamsExcept(def_copy);
   g_modules[name] = g_module_infos[type]->instantiate(params);
-  
-  return g_modules[name];
 }
 
 EXCEPTION(NoOutputModuleExcept, Exception, "No output module")
 EXCEPTION(OutputNotStereoExcept, Exception, "Output not stereo")
+EXCEPTION_D(CouldntOpenFileExcept, Exception, "Couldn't open file")
 
-void produceStream(short *buffer, int samples)
-{ 
+Module *setupStream()
+{
   fillModuleList();
   g_module_infos["Input"] = new ModuleInfo("Input", Input::create);
   g_module_infos["Input"]->addParameter("axis", "int");
 
+  char *patch_filename = "pad.pat";
+  for(int i=1; i<argCount(); i++)
+    if(memcmp(getArg(i), "patch:", 6) == 0)
+      patch_filename = getArg(i)+6;
+
+  FILE *in = fopen(patch_filename, "r");
+  if(!in) throw CouldntOpenFileExcept(patch_filename);
+
+  char s[256];
+  while(!feof(in))
+  {
+    fgets(s, 255, in);
+    addModule(s);
+  }
+  
+  fclose(in);
+
+  for(int i=1; i<argCount(); i++)
+    if(memcmp(getArg(i), "log:", 4) == 0)
+    {      
+      char loglist[256];
+      strncpy(loglist, getArg(i)+4, 255);
+      char *name = strtok(loglist, ",");
+      do
+      {
+        if(!g_modules.count(name)) throw UnknownModuleExcept(name);
+        g_modules[name]->log(string(name)+".wav");
+      }        
+      while(name = strtok(0, ","));
+    }
+
+  if(!g_modules.count("output")) throw NoOutputModuleExcept();
+  Module *output = g_modules["output"];
+  if(!output->stereo()) throw OutputNotStereoExcept();
+  return output;
+}
+
+void produceStream(short *buffer, int samples)
+{ 
   static bool first = true;
   static Module *output;
   if(first)
   {
     first = false;
-    FILE *in = fopen("patch.txt", "r");
-    char s[256];
-    while(!feof(in))
-    {
-      fgets(s, 255, in);
-      addModule(s);
-    }
-    if(!g_modules.count("output")) throw NoOutputModuleExcept();
-    output = g_modules["output"];
-    if(!output->stereo()) throw OutputNotStereoExcept();
+    output = setupStream();
   }
   
   static float time = 0;

@@ -5,6 +5,15 @@
 #include <windows.h>
 
 static HANDLE console;
+static float input_x, input_y, input_button;
+
+static const int key_buffer_size = 16;
+static char key_buffer[key_buffer_size];
+static int key_write_pos = 0;
+static int key_read_pos = 0;
+
+static int argc;
+static char **argv;
 
 void gotoXY(int x, int y)
 {
@@ -12,8 +21,10 @@ void gotoXY(int x, int y)
   SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 }
 
-void initInput()
+void initInput(int _argc, char **_argv)
 {
+  argc = _argc, argv = _argv;
+  
   console = GetStdHandle(STD_INPUT_HANDLE);
   SetConsoleMode(console, ENABLE_EXTENDED_FLAGS | ENABLE_MOUSE_INPUT);
   
@@ -27,6 +38,13 @@ void initInput()
   printf("Click to make noise, escape to quit.");
 }
 
+int argCount() { return argc; }
+char *getArg(int n)
+{
+  if(n >= 0 && n < argc) return argv[n];
+  return 0;
+}
+
 void deinitInput()
 {
   COORD origin = { 0, 0 };
@@ -35,38 +53,31 @@ void deinitInput()
                              origin, &out);
 }
 
-static float g_x, g_y, g_button;
-
-const int key_buffer_size = 16;
-char g_key_buffer[key_buffer_size];
-int g_key_write_pos = 0;
-int g_key_read_pos = 0;
-
 void readInput();
 
 void getMouseState(float *x, float *y, float *button)
 {
   readInput();
-  *x = g_x;
-  *y = g_y;
-  *button = g_button;
+  *x = input_x;
+  *y = input_y;
+  *button = input_button;
 }
 
 char getKey()
 {
   readInput();
-  if(g_key_read_pos == g_key_write_pos) return 0;
-  char c = g_key_buffer[g_key_read_pos++];
-  g_key_read_pos %= key_buffer_size;
+  if(key_read_pos == key_write_pos) return 0;
+  char c = key_buffer[key_read_pos++];
+  key_read_pos %= key_buffer_size;
   return c;
 }
 
 void readInput()
 {
   static float oldx, oldy, oldbutton;
-  g_x = oldx;
-  g_y = oldy;
-  g_button = oldbutton;
+  input_x = oldx;
+  input_y = oldy;
+  input_button = oldbutton;
 
   DWORD events_left = 0;
   
@@ -81,28 +92,28 @@ void readInput()
     for(unsigned int i=0; i<events_read; i++)
       if(events[i].EventType==MOUSE_EVENT)
       {
-        g_x = events[i].Event.MouseEvent.dwMousePosition.X / 40.0f - 1;
-        g_y = 1 - events[i].Event.MouseEvent.dwMousePosition.Y / 25.0f;
-        g_button = (events[i].Event.MouseEvent.dwButtonState &
-                    FROM_LEFT_1ST_BUTTON_PRESSED) ? 1.0f:0.0f;
+        input_x = -1 + events[i].Event.MouseEvent.dwMousePosition.X / 40.0f;
+        input_y =  1 - events[i].Event.MouseEvent.dwMousePosition.Y / 25.0f;
+        input_button = (events[i].Event.MouseEvent.dwButtonState &
+                        FROM_LEFT_1ST_BUTTON_PRESSED) ? 1.0f:0.0f;
       }
       else if(events[i].EventType==KEY_EVENT &&
               events[i].Event.KeyEvent.bKeyDown)
       {
         int key = events[i].Event.KeyEvent.uChar.AsciiChar;
-        if(key && (g_key_write_pos+1) % key_buffer_size != g_key_read_pos)
+        if(key && (key_write_pos+1) % key_buffer_size != key_read_pos)
         {
-          g_key_buffer[g_key_write_pos++] = key;          
-          g_key_write_pos %= key_buffer_size;
+          key_buffer[key_write_pos++] = key;          
+          key_write_pos %= key_buffer_size;
         }
       }
       
     events_left -= events_read;
   }
   
-  oldx = g_x;
-  oldy = g_y;
-  oldbutton = g_button;
+  oldx = input_x;
+  oldy = input_y;
+  oldbutton = input_button;
   
   gotoXY(0, 0);
 }
