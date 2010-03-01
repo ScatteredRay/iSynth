@@ -16,7 +16,7 @@
    reverbing each channel individually.
 
    Todo:
-   - rectifier, clipper, slew limiter, switch
+   - slew limiter, switch
    - support for arbitrary parameter count
      | sequencer (retriggerable)
      \- oscillator hard sync
@@ -49,7 +49,7 @@
    - escape to quit
    - patch selection from command line
    - output logging from command line
-   - limiter
+   - reimplemented: limiter, rectifier, clipper, stereo rotate
 */
 #include "synth.h"
 
@@ -450,17 +450,18 @@ void addModule(char *definition)
     ModuleParam *m = new ModuleParam();
     if(param_type=="float")
     {
-      if(!isdigit(*t)) throw ExpectingFloatExcept(def_copy+t);
+      if(!isdigit(*t) && *t!='-' && *t!='.')
+        throw ExpectingFloatExcept(def_copy+t);
       m->m_float = atof(t);
     }
     else if(param_type=="int")
     {
-      if(!isdigit(*t)) throw ExpectingIntExcept(def_copy+t);
-      m->m_int = atof(t);
+      if(!isdigit(*t) && *t!='-') throw ExpectingIntExcept(def_copy+t);
+      m->m_int = atoi(t);
     }
     else if(param_type=="Module")
     {
-      if(isdigit(*t))
+      if(isdigit(*t) || *t=='-' || *t=='.')
         m->m_module = new Constant(atof(t));
       else
       {

@@ -16,10 +16,11 @@ Rescaler vibrato(vibrato_enveloped, 0.985, 1.015)
 Multiply freq(note_freq, vibrato)
 
 #noise
-Saw osc1(freq)
+Sine osc1(freq)
+Rectifier osc1_rect(osc1)
 Add freq_detuned(freq, 0.3)
 Pulse osc2(freq_detuned, 0.8)
-Add oscs(osc1, osc2)
+Add oscs(osc1_rect, osc2)
 
 #filter
 EnvelopeGenerator env(touch, 0.01, 0.7, 0.5, 0.1)
@@ -29,6 +30,8 @@ Multiply cutoff(cutoff_y, cutoff_env)
 Add cutoff_offset(cutoff, freq)
 Filter filter(oscs, cutoff_offset, 0.95)
 
-#output
+#amp
 Multiply notes(filter, env)
-PingPongDelay output(0.1, 0.5, notes, 0.5, 1.0, 0.8)
+
+#panning
+PingPongDelay output(0.1, 0.2, notes, 0.5, 1.0, 0.9)

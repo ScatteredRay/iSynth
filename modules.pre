@@ -262,6 +262,28 @@
     preamp: 1, 10
 @
 
+@module Rectifier(input):
+  fill:
+    *output++ = abs(input[i]);
+  output_range:
+    float imin, imax;
+    m_input->getOutputRange(&imin, &imax);
+    *out_min = 0, *out_max = max(abs(imin), abs(imax));
+@
+
+@module Clipper(input, min, max):
+  fill:
+    float sample = input[i];
+    if(sample > max[i]) sample = max[i];
+    if(sample < min[i]) sample = min[i];
+    *output++ = sample;
+  output_range:
+    float min_min, min_max, max_min, max_max;
+    m_min->getOutputRange(&min_min, &min_max);
+    m_max->getOutputRange(&max_min, &max_max);
+    *out_min = min(min_min, max_min), *out_max = max(min_max, max_max);
+@
+
 @module NoteToFrequency(input, string scale_name):
   members:
     char* scale=0
@@ -338,7 +360,10 @@
       delete[] m_buffer_right;
     }
   output_range:
-    m_input->getOutputRange(out_min, out_max); // wrong for extreme settings
+    float min, max;
+    m_input->getOutputRange(&min, &max);
+    *out_min = min*2; // um, i think...
+    *out_max = max*2;
   input_range:
     wet: 0, 1
     dry: 0, 1
@@ -359,6 +384,17 @@
     
     if(++m_write_pos >= m_length) m_write_pos -= m_length;
     if(++m_read_pos  >= m_length) m_read_pos  -= m_length;
+@
+
+@stereomodule Rotate(StereoModule input, angle):
+  fill:
+    float left  = *input++;
+    float right = *input++;
+    float cos_mul = cos(angle[i]), sin_mul = sin(angle[i]);
+    *output++ = left*cos_mul + right*sin_mul;
+    *output++ = left*sin_mul + right*cos_mul;
+  output_range:
+    m_input->getOutputRange(out_min, out_max);
 @
 
 /*
@@ -475,42 +511,4 @@ class Delay : public Module
     
     Module &m_input, &m_wet, &m_dry, &m_feedback, &m_speed;
 };
-
-class Rotate : public StereoModule
-{
-  public:
-    Rotate(StereoModule &input, Module &angle)
-    : m_input(input), m_angle(angle)
-    {}
-    
-    const char *moduleName() { return "Rotate"; }
-
-    void fill(float last_fill, int samples)
-    {
-      const float *input = m_input.output(last_fill, samples);
-      const float *angle = m_angle.output(last_fill, samples);
-      float *output = m_output;
-      
-      for(int i=0; i<samples; i++)
-      {
-        float left  = *input++;
-        float right = *input++;
-        float cos_mul = cos(angle[i]), sin_mul = sin(angle[i]);
-        *output++ = left*cos_mul + right*sin_mul;
-        *output++ = left*sin_mul + right*cos_mul;
-      }
-    }
-
-    void getOutputRange(float *out_min, float *out_max)
-    {      
-      m_input.getOutputRange(out_min, out_max);
-    }
-
-    void validateInputRange() {} // don't care
-
-   private:
-    StereoModule &m_input;
-    Module &m_angle;
-};
-
 */

@@ -734,6 +734,100 @@ class Limiter : public Module
 };
 
 
+class Rectifier : public Module
+{
+  public:
+    Rectifier(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_module;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new Rectifier(parameters);
+    }
+
+    const char *moduleName() { return "Rectifier"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = abs(input[i]);
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      float imin, imax;
+      m_input->getOutputRange(&imin, &imax);
+      *out_min = 0, *out_max = max(abs(imin), abs(imax));
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
+    Module *m_input;
+};
+
+
+class Clipper : public Module
+{
+  public:
+    Clipper(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_module;
+      m_min = parameters[1]->m_module;
+      m_max = parameters[2]->m_module;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new Clipper(parameters);
+    }
+
+    const char *moduleName() { return "Clipper"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+      const float *min = m_min->output(last_fill, samples);
+      const float *max = m_max->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        float sample = input[i];
+        if(sample > max[i]) sample = max[i];
+        if(sample < min[i]) sample = min[i];
+        *output++ = sample;
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      float min_min, min_max, max_min, max_max;
+      m_min->getOutputRange(&min_min, &min_max);
+      m_max->getOutputRange(&max_min, &max_max);
+      *out_min = min(min_min, max_min), *out_max = max(min_max, max_max);
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
+    Module *m_input;
+    Module *m_min;
+    Module *m_max;
+};
+
+
 class NoteToFrequency : public Module
 {
   public:
@@ -958,7 +1052,10 @@ class PingPongDelay : public StereoModule
 
     void getOutputRange(float *out_min, float *out_max)
     {
-      m_input->getOutputRange(out_min, out_max); // wrong for extreme settings
+      float min, max;
+      m_input->getOutputRange(&min, &max);
+      *out_min = min*2; // um, i think...
+      *out_max = max*2;
     }
 
     void validateInputRange()
@@ -981,6 +1078,53 @@ class PingPongDelay : public StereoModule
     int m_write_pos;
     int m_last_sample_left;
     int m_last_sample_right;
+};
+
+
+class Rotate : public StereoModule
+{
+  public:
+    Rotate(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_stereomodule;
+      m_angle = parameters[1]->m_module;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new Rotate(parameters);
+    }
+
+    const char *moduleName() { return "Rotate"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+      const float *angle = m_angle->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        float left  = *input++;
+        float right = *input++;
+        float cos_mul = cos(angle[i]), sin_mul = sin(angle[i]);
+        *output++ = left*cos_mul + right*sin_mul;
+        *output++ = left*sin_mul + right*cos_mul;
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      m_input->getOutputRange(out_min, out_max);
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
+    StereoModule *m_input;
+    Module *m_angle;
 };
 
 /*
@@ -1097,44 +1241,6 @@ class Delay : public Module
 
     Module &m_input, &m_wet, &m_dry, &m_feedback, &m_speed;
 };
-
-class Rotate : public StereoModule
-{
-  public:
-    Rotate(StereoModule &input, Module &angle)
-    : m_input(input), m_angle(angle)
-    {}
-
-    const char *moduleName() { return "Rotate"; }
-
-    void fill(float last_fill, int samples)
-    {
-      const float *input = m_input.output(last_fill, samples);
-      const float *angle = m_angle.output(last_fill, samples);
-      float *output = m_output;
-
-      for(int i=0; i<samples; i++)
-      {
-        float left  = *input++;
-        float right = *input++;
-        float cos_mul = cos(angle[i]), sin_mul = sin(angle[i]);
-        *output++ = left*cos_mul + right*sin_mul;
-        *output++ = left*sin_mul + right*cos_mul;
-      }
-    }
-
-    void getOutputRange(float *out_min, float *out_max)
-    {
-      m_input.getOutputRange(out_min, out_max);
-    }
-
-    void validateInputRange() {} // don't care
-
-   private:
-    StereoModule &m_input;
-    Module &m_angle;
-};
-
 */
 void fillModuleList()
 {
@@ -1176,6 +1282,12 @@ void fillModuleList()
   g_module_infos["Limiter"] = new ModuleInfo("Limiter", Limiter::create);
   g_module_infos["Limiter"]->addParameter("input", "Module");
   g_module_infos["Limiter"]->addParameter("preamp", "Module");
+  g_module_infos["Rectifier"] = new ModuleInfo("Rectifier", Rectifier::create);
+  g_module_infos["Rectifier"]->addParameter("input", "Module");
+  g_module_infos["Clipper"] = new ModuleInfo("Clipper", Clipper::create);
+  g_module_infos["Clipper"]->addParameter("input", "Module");
+  g_module_infos["Clipper"]->addParameter("min", "Module");
+  g_module_infos["Clipper"]->addParameter("max", "Module");
   g_module_infos["NoteToFrequency"] = new ModuleInfo("NoteToFrequency", NoteToFrequency::create);
   g_module_infos["NoteToFrequency"]->addParameter("input", "Module");
   g_module_infos["NoteToFrequency"]->addParameter("scale_name", "string");
@@ -1192,4 +1304,7 @@ void fillModuleList()
   g_module_infos["PingPongDelay"]->addParameter("wet", "Module");
   g_module_infos["PingPongDelay"]->addParameter("dry", "Module");
   g_module_infos["PingPongDelay"]->addParameter("feedback", "Module");
+  g_module_infos["Rotate"] = new ModuleInfo("Rotate", Rotate::create);
+  g_module_infos["Rotate"]->addParameter("input", "StereoModule");
+  g_module_infos["Rotate"]->addParameter("angle", "Module");
 }
