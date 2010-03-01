@@ -284,6 +284,17 @@
     *out_min = min(min_min, max_min), *out_max = max(min_max, max_max);
 @
 
+@module SlewLimiter(input, float up, float down):
+  members:
+    float last = 0
+  fill:
+    if(input[i] > m_last) m_last = input[i]*m_up   + m_last*(1-m_up  );
+    else                  m_last = input[i]*m_down + m_last*(1-m_down);
+    *output++ = m_last;
+  output_range:
+    m_input->getOutputRange(out_min, out_max);
+@
+
 @module NoteToFrequency(input, string scale_name):
   members:
     char* scale=0

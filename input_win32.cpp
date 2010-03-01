@@ -92,10 +92,13 @@ void readInput()
     for(unsigned int i=0; i<events_read; i++)
       if(events[i].EventType==MOUSE_EVENT)
       {
-        input_x = -1 + events[i].Event.MouseEvent.dwMousePosition.X / 40.0f;
-        input_y =  1 - events[i].Event.MouseEvent.dwMousePosition.Y / 25.0f;
         input_button = (events[i].Event.MouseEvent.dwButtonState &
                         FROM_LEFT_1ST_BUTTON_PRESSED) ? 1.0f:0.0f;
+        if(input_button == 1.0)
+        {
+          input_x = -1 + events[i].Event.MouseEvent.dwMousePosition.X / 40.0f;
+          input_y =  1 - events[i].Event.MouseEvent.dwMousePosition.Y / 25.0f;        
+        }
       }
       else if(events[i].EventType==KEY_EVENT &&
               events[i].Event.KeyEvent.bKeyDown)

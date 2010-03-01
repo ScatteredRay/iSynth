@@ -828,6 +828,54 @@ class Clipper : public Module
 };
 
 
+class SlewLimiter : public Module
+{
+  public:
+    SlewLimiter(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_module;
+      m_up = parameters[1]->m_float;
+      m_down = parameters[2]->m_float;
+      m_last = 0;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new SlewLimiter(parameters);
+    }
+
+    const char *moduleName() { return "SlewLimiter"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        if(input[i] > m_last) m_last = input[i]*m_up   + m_last*(1-m_up  );
+        else                  m_last = input[i]*m_down + m_last*(1-m_down);
+        *output++ = m_last;
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      m_input->getOutputRange(out_min, out_max);
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
+    Module *m_input;
+    float m_up;
+    float m_down;
+    float m_last;
+};
+
+
 class NoteToFrequency : public Module
 {
   public:
@@ -1288,6 +1336,10 @@ void fillModuleList()
   g_module_infos["Clipper"]->addParameter("input", "Module");
   g_module_infos["Clipper"]->addParameter("min", "Module");
   g_module_infos["Clipper"]->addParameter("max", "Module");
+  g_module_infos["SlewLimiter"] = new ModuleInfo("SlewLimiter", SlewLimiter::create);
+  g_module_infos["SlewLimiter"]->addParameter("input", "Module");
+  g_module_infos["SlewLimiter"]->addParameter("up", "float");
+  g_module_infos["SlewLimiter"]->addParameter("down", "float");
   g_module_infos["NoteToFrequency"] = new ModuleInfo("NoteToFrequency", NoteToFrequency::create);
   g_module_infos["NoteToFrequency"]->addParameter("input", "Module");
   g_module_infos["NoteToFrequency"]->addParameter("scale_name", "string");

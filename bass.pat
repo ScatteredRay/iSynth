@@ -7,13 +7,14 @@ Input touch(2)
 Rescaler note(x, 24, 48)
 Quantize note_quant(note)
 NoteToFrequency note_freq(note_quant, "lydian")
+SlewLimiter note_freq_sl(note_freq, .0005, .0005)
 
 #vibrato
 Sine vibrato_lfo(3)
 EnvelopeGenerator vibrato_env(touch, 2, 1, 1, 1)
 Multiply vibrato_enveloped(vibrato_lfo, vibrato_env)
 Rescaler vibrato(vibrato_enveloped, 0.985, 1.015)
-Multiply freq(note_freq, vibrato)
+Multiply freq(note_freq_sl, vibrato)
 
 #noise
 Sine osc1(freq)
