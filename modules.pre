@@ -12,6 +12,43 @@
     frequency: 0, 22050
 @
 
+@module Sample(string sample_name, int native_sample_rate, frequency, retrigger, loop_start, loop_end):
+  members:
+    float   position = 0
+    WaveIn* sample = 0
+    float   rate_coefficient = 0
+    bool    waiting = true
+  initialize:
+    m_sample = new WaveIn(m_sample_name);
+    m_rate_coefficient = 1.0 / m_sample->length() / sample_rate;
+  misc:
+    ~Sample() { delete m_sample; }
+  fill:
+    *output++ = m_sample->valueAt(m_position);
+    m_position += (frequency[i]*m_native_sample_rate/middle_c) * m_rate_coefficient;
+    
+    if(!m_waiting)
+    {
+      if(retrigger[i] < 0.1) m_waiting = true;
+    }
+    else
+    {
+      if(retrigger[i] > 0.9) 
+      {
+        m_waiting = false;
+        m_position = 0;
+      }
+    }
+
+    if(m_position > loop_end[i])
+      m_position -= (loop_end[i] - loop_start[i]);
+  output_range:
+    *out_min = -1;
+    *out_max =  1;
+  input_range:
+    frequency: 0, 22050
+@
+
 @module Pulse(frequency, pulsewidth):
   members:
     float position = 0
@@ -287,6 +324,9 @@
 @module SlewLimiter(input, float up, float down):
   members:
     float last = 0
+  initialize:
+    float dummy;
+    m_input->getOutputRange(&m_last, &dummy);
   fill:
     if(input[i] > m_last) m_last = input[i]*m_up   + m_last*(1-m_up  );
     else                  m_last = input[i]*m_down + m_last*(1-m_down);

@@ -46,6 +46,87 @@ class Saw : public Module
 };
 
 
+class Sample : public Module
+{
+  public:
+    Sample(vector<ModuleParam *> parameters)
+    {
+      m_sample_name = parameters[0]->m_string;
+      m_native_sample_rate = parameters[1]->m_int;
+      m_frequency = parameters[2]->m_module;
+      m_retrigger = parameters[3]->m_module;
+      m_loop_start = parameters[4]->m_module;
+      m_loop_end = parameters[5]->m_module;
+      m_position = 0;
+      m_sample = 0;
+      m_rate_coefficient = 0;
+      m_waiting = true;
+      m_sample = new WaveIn(m_sample_name);
+      m_rate_coefficient = 1.0 / m_sample->length() / sample_rate;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new Sample(parameters);
+    }
+
+    const char *moduleName() { return "Sample"; }
+    ~Sample() { delete m_sample; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *frequency = m_frequency->output(last_fill, samples);
+      const float *retrigger = m_retrigger->output(last_fill, samples);
+      const float *loop_start = m_loop_start->output(last_fill, samples);
+      const float *loop_end = m_loop_end->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = m_sample->valueAt(m_position);
+        m_position += (frequency[i]*m_native_sample_rate/middle_c) * m_rate_coefficient;
+        if(!m_waiting)
+        {
+          if(retrigger[i] < 0.1) m_waiting = true;
+        }
+        else
+        {
+          if(retrigger[i] > 0.9)
+          {
+            m_waiting = false;
+            m_position = 0;
+          }
+        }
+        if(m_position > loop_end[i])
+          m_position -= (loop_end[i] - loop_start[i]);
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      *out_min = -1;
+      *out_max =  1;
+    }
+
+    void validateInputRange()
+    {
+      validateWithin(*m_frequency, 0, 22050);
+    }
+  private:
+    string m_sample_name;
+    int m_native_sample_rate;
+    Module *m_frequency;
+    Module *m_retrigger;
+    Module *m_loop_start;
+    Module *m_loop_end;
+    float m_position;
+    WaveIn* m_sample;
+    float m_rate_coefficient;
+    bool m_waiting;
+};
+
+
 class Pulse : public Module
 {
   public:
@@ -837,6 +918,8 @@ class SlewLimiter : public Module
       m_up = parameters[1]->m_float;
       m_down = parameters[2]->m_float;
       m_last = 0;
+      float dummy;
+      m_input->getOutputRange(&m_last, &dummy);
 
     }
     static Module *create(vector<ModuleParam *> parameters)
@@ -1294,6 +1377,13 @@ void fillModuleList()
 {
   g_module_infos["Saw"] = new ModuleInfo("Saw", Saw::create);
   g_module_infos["Saw"]->addParameter("frequency", "Module");
+  g_module_infos["Sample"] = new ModuleInfo("Sample", Sample::create);
+  g_module_infos["Sample"]->addParameter("sample_name", "string");
+  g_module_infos["Sample"]->addParameter("native_sample_rate", "int");
+  g_module_infos["Sample"]->addParameter("frequency", "Module");
+  g_module_infos["Sample"]->addParameter("retrigger", "Module");
+  g_module_infos["Sample"]->addParameter("loop_start", "Module");
+  g_module_infos["Sample"]->addParameter("loop_end", "Module");
   g_module_infos["Pulse"] = new ModuleInfo("Pulse", Pulse::create);
   g_module_infos["Pulse"]->addParameter("frequency", "Module");
   g_module_infos["Pulse"]->addParameter("pulsewidth", "Module");

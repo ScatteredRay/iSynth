@@ -16,13 +16,11 @@
    reverbing each channel individually.
 
    Todo:
-   - slew limiter, switch
+   - switch
    - support for arbitrary parameter count
      | sequencer (retriggerable)
      \- oscillator hard sync
    - support relative bending after touchdown
-   - sample playback (wave reader)
-   - text file patch definitions
    - multiple intonations!  just, meantone, quarter tone, well-tempered, etc.
    - replay output from wave, to find nasty clicks (wave reader)
    - oscillator band-limiting (http://www.fly.net/~ant/bl-synth/ ?)
@@ -45,11 +43,12 @@
    - rename unitscaler to rescaler; make it scale input range to new range
    - input range validation
    - module definition preprocessor
-   - read patches from text file
+   - text file patch definitions
    - escape to quit
    - patch selection from command line
    - output logging from command line
-   - reimplemented: limiter, rectifier, clipper, stereo rotate
+   - reimplemented: limiter, rectifier, clipper, stereo rotate, slew limiter
+   - sample playback (wave reader)
 */
 #include "synth.h"
 
@@ -80,6 +79,7 @@ using namespace std;
 
 const float pi = 3.1415926535897932384626f, e = 2.71828183f;
 const float note_0 = 8.1757989156;
+const float middle_c = 261.625565;
 const int max_buffer_size = 4000;
 const int sample_rate = 44100;
 
@@ -109,31 +109,79 @@ struct
 };
 
 EXCEPTION_D(CouldntWriteExcept, Exception, "Couldn't open for writing")
+EXCEPTION_D(CouldntReadExcept,  Exception, "Couldn't open for reading")
+EXCEPTION_D(UnhandledWaveFormatException, Exception,
+            "Can only handle 16-bit PCM .wav files")
+static unsigned char wave_header[] =
+{
+  'R', 'I', 'F', 'F',
+  0x00, 0x00, 0x00, 0x00, // wave size+36; patch later
+  'W', 'A', 'V', 'E', 'f', 'm', 't', ' ',
+  0x10, 0x00, 0x00, 0x00, 0x01, 0x00, // PCM
+  0x01, 0x00, // channels
+  0x44, 0xAC, 0x00, 0x00, // 44.1khz
+  0x10, 0xB1, 0x02, 0x00, // 176400 bytes/sec
+  0x02, 0x00, // bytes per sample*channels
+  0x10, 0x00, // 16 bits
+  'd', 'a', 't', 'a',
+  0x00, 0x00, 0x00, 0x00, // wave size again
+};
+
+class WaveIn
+{
+  public:
+    WaveIn(const string filename)
+    {
+      FILE *in = fopen(filename.c_str(), "rb");
+      if(!in) throw CouldntReadExcept(filename);
+      
+      static unsigned char header[sizeof(wave_header)];
+      fread(header, sizeof(wave_header), 1, in);
+      if(memcmp(header, wave_header, 4) || memcmp(header+8, wave_header+8, 8) ||
+         memcmp(header+20, wave_header+20, 2) ||
+         memcmp(header+34, wave_header+34, 6))
+        throw UnhandledWaveFormatException(filename);
+      
+      memcpy(&m_length, header+40, 4);
+      m_length /= 2;
+      m_stereo = header[22]==2 ? true : false;
+      
+      m_buffer = new float[m_length];
+      static short buf[1024];
+      for(int i=0; !feof(in) && i<m_length; i+=1024)
+      {
+        int len = min(1024, m_length-i);
+        fread(buf, 2, len, in);
+        for(int j=0; j<len; j++)
+          m_buffer[i+j] = buf[j]/32768.0;
+      }
+      fclose(in);
+    }
+    ~WaveIn() { delete m_buffer; }
+    
+    int length() const { return m_length; }
+    float valueAt(float position)
+    {
+      return m_buffer[int(position*(m_length-1))];
+    }
+    
+  private:
+    float *m_buffer;
+    int    m_length;
+    bool   m_stereo;
+};
 
 class WaveOut
 {
   public:
-    WaveOut(const std::string filename, float scaler=32768, bool stereo=false)
+    WaveOut(const string filename, float scaler=32768, bool stereo=false)
     : m_scaler(scaler), m_length(0)
     {
       m_out = fopen(filename.c_str(), "wb");
-      if(!m_out) throw CouldntWriteExcept("couldn't open file for writing");
-      unsigned char header[] =
-      {
-        'R', 'I', 'F', 'F',
-        0x00, 0x00, 0x00, 0x00, // wave size+36; patch later
-        'W', 'A', 'V', 'E', 'f', 'm', 't', ' ',
-        0x10, 0x00, 0x00, 0x00, 0x01, 0x00, // PCM
-        0x01, 0x00, // channels
-        0x44, 0xAC, 0x00, 0x00, // 44.1khz
-        0x10, 0xB1, 0x02, 0x00, // 176400 bytes/sec
-        0x02, 0x00, // bytes per sample*channels
-        0x10, 0x00, // 16 bits
-        'd', 'a', 't', 'a',
-        0x00, 0x00, 0x00, 0x00, // wave size again
-      };
-      if(stereo) header[22] = 0x02, header[32] = 0x04;
-      fwrite(header, sizeof(header), 1, m_out);
+      if(!m_out) throw CouldntWriteExcept(filename);
+      if(stereo) wave_header[22] = 0x02, wave_header[32] = 0x04;
+      else       wave_header[22] = 0x01, wave_header[32] = 0x02;
+      fwrite(wave_header, sizeof(wave_header), 1, m_out);
     }
 
     ~WaveOut() { close(); }
