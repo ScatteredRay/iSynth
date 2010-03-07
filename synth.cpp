@@ -563,7 +563,7 @@ Module *setupStream()
   g_module_infos["Input"] = new ModuleInfo("Input", Input::create);
   g_module_infos["Input"]->addParameter("axis", "int");
 
-  char *patch_filename = "pad.pat";
+  char *patch_filename = "patches/pad.pat";
   for(int i=1; i<argCount(); i++)
     if(!strchr(getArg(i), ':')) patch_filename = getArg(i);
 
