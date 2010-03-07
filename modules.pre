@@ -12,33 +12,25 @@
     frequency: 0, 22050
 @
 
-@module Sample(string sample_name, int native_sample_rate, frequency, retrigger, loop_start, loop_end):
+@module Sample(string sample_name, frequency, retrigger, loop_start, loop_end):
   members:
-    float   position = 0
-    WaveIn* sample = 0
+    float   position         = 0
+    WaveIn* sample           = 0
     float   rate_coefficient = 0
-    bool    waiting = true
+    float   last_trigger     = 0
   initialize:
     m_sample = new WaveIn(m_sample_name);
-    m_rate_coefficient = 1.0 / m_sample->length() / sample_rate;
+    m_rate_coefficient = m_sample->nativeSampleRate() / middle_c /
+                         m_sample->length() / sample_rate;
   misc:
     ~Sample() { delete m_sample; }
   fill:
     *output++ = m_sample->valueAt(m_position);
-    m_position += (frequency[i]*m_native_sample_rate/middle_c) * m_rate_coefficient;
+    m_position += frequency[i] * m_rate_coefficient;
     
-    if(!m_waiting)
-    {
-      if(retrigger[i] < 0.1) m_waiting = true;
-    }
-    else
-    {
-      if(retrigger[i] > 0.9) 
-      {
-        m_waiting = false;
-        m_position = 0;
-      }
-    }
+    if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+      m_position = 0;
+    m_last_trigger = retrigger[i];
 
     if(m_position > loop_end[i])
       m_position -= (loop_end[i] - loop_start[i]);
@@ -47,6 +39,9 @@
     *out_max =  1;
   input_range:
     frequency: 0, 22050
+    retrigger: 0, 1
+    loop_start: 0, 1
+    loop_end: 0, 1
 @
 
 @module Pulse(frequency, pulsewidth):
@@ -270,23 +265,15 @@
   members:
     bool waiting = true
     float value = 0
+    float last_trigger = 0
   output_range:
     m_source->getOutputRange(out_min, out_max);
   input_range:
     trigger: 0, 1
   fill:
-    if(!m_waiting)
-    {
-      if(trigger[i] < 0.1) m_waiting = true;
-    }
-    else
-    {
-      if(trigger[i] > 0.9)
-      {
-        m_waiting = false;
-        m_value = source[i];
-      }
-    }
+    if(m_last_trigger < 0.1 && trigger[i] > 0.9)
+      m_value = source[i];
+    m_last_trigger = trigger[i];
     *output++ = m_value;
 @
 

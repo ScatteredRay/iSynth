@@ -52,17 +52,17 @@ class Sample : public Module
     Sample(vector<ModuleParam *> parameters)
     {
       m_sample_name = parameters[0]->m_string;
-      m_native_sample_rate = parameters[1]->m_int;
-      m_frequency = parameters[2]->m_module;
-      m_retrigger = parameters[3]->m_module;
-      m_loop_start = parameters[4]->m_module;
-      m_loop_end = parameters[5]->m_module;
+      m_frequency = parameters[1]->m_module;
+      m_retrigger = parameters[2]->m_module;
+      m_loop_start = parameters[3]->m_module;
+      m_loop_end = parameters[4]->m_module;
       m_position = 0;
       m_sample = 0;
       m_rate_coefficient = 0;
-      m_waiting = true;
+      m_last_trigger = 0;
       m_sample = new WaveIn(m_sample_name);
-      m_rate_coefficient = 1.0 / m_sample->length() / sample_rate;
+      m_rate_coefficient = m_sample->nativeSampleRate() / middle_c /
+                           m_sample->length() / sample_rate;
 
     }
     static Module *create(vector<ModuleParam *> parameters)
@@ -85,19 +85,10 @@ class Sample : public Module
       for(int i=0; i<samples; i++)
       {
         *output++ = m_sample->valueAt(m_position);
-        m_position += (frequency[i]*m_native_sample_rate/middle_c) * m_rate_coefficient;
-        if(!m_waiting)
-        {
-          if(retrigger[i] < 0.1) m_waiting = true;
-        }
-        else
-        {
-          if(retrigger[i] > 0.9)
-          {
-            m_waiting = false;
-            m_position = 0;
-          }
-        }
+        m_position += frequency[i] * m_rate_coefficient;
+        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+          m_position = 0;
+        m_last_trigger = retrigger[i];
         if(m_position > loop_end[i])
           m_position -= (loop_end[i] - loop_start[i]);
       }
@@ -112,10 +103,12 @@ class Sample : public Module
     void validateInputRange()
     {
       validateWithin(*m_frequency, 0, 22050);
+      validateWithin(*m_retrigger, 0, 1);
+      validateWithin(*m_loop_start, 0, 1);
+      validateWithin(*m_loop_end, 0, 1);
     }
   private:
     string m_sample_name;
-    int m_native_sample_rate;
     Module *m_frequency;
     Module *m_retrigger;
     Module *m_loop_start;
@@ -123,7 +116,7 @@ class Sample : public Module
     float m_position;
     WaveIn* m_sample;
     float m_rate_coefficient;
-    bool m_waiting;
+    float m_last_trigger;
 };
 
 
@@ -720,6 +713,7 @@ class SampleAndHold : public Module
       m_trigger = parameters[1]->m_module;
       m_waiting = true;
       m_value = 0;
+      m_last_trigger = 0;
 
     }
     static Module *create(vector<ModuleParam *> parameters)
@@ -738,18 +732,9 @@ class SampleAndHold : public Module
 
       for(int i=0; i<samples; i++)
       {
-        if(!m_waiting)
-        {
-          if(trigger[i] < 0.1) m_waiting = true;
-        }
-        else
-        {
-          if(trigger[i] > 0.9)
-          {
-            m_waiting = false;
-            m_value = source[i];
-          }
-        }
+        if(m_last_trigger < 0.1 && trigger[i] > 0.9)
+          m_value = source[i];
+        m_last_trigger = trigger[i];
         *output++ = m_value;
       }
     }
@@ -768,6 +753,7 @@ class SampleAndHold : public Module
     Module *m_trigger;
     bool m_waiting;
     float m_value;
+    float m_last_trigger;
 };
 
 
@@ -1379,7 +1365,6 @@ void fillModuleList()
   g_module_infos["Saw"]->addParameter("frequency", "Module");
   g_module_infos["Sample"] = new ModuleInfo("Sample", Sample::create);
   g_module_infos["Sample"]->addParameter("sample_name", "string");
-  g_module_infos["Sample"]->addParameter("native_sample_rate", "int");
   g_module_infos["Sample"]->addParameter("frequency", "Module");
   g_module_infos["Sample"]->addParameter("retrigger", "Module");
   g_module_infos["Sample"]->addParameter("loop_start", "Module");

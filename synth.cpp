@@ -16,13 +16,14 @@
    reverbing each channel individually.
 
    Todo:
+   - interpolated sample playback
    - switch
    - support for arbitrary parameter count
      | sequencer (retriggerable)
      \- oscillator hard sync
    - support relative bending after touchdown
    - multiple intonations!  just, meantone, quarter tone, well-tempered, etc.
-   - replay output from wave, to find nasty clicks (wave reader)
+   - replay output from wave, to find nasty clicks (wave streamer)
    - oscillator band-limiting (http://www.fly.net/~ant/bl-synth/ ?)
    - additional filters?  eq?
    - reverb
@@ -142,7 +143,8 @@ class WaveIn
          memcmp(header+34, wave_header+34, 6))
         throw UnhandledWaveFormatException(filename);
       
-      memcpy(&m_length, header+40, 4);
+      memcpy(&m_native_sample_rate, header+24, 4);
+      memcpy(&m_length, header+40, 4);      
       m_length /= 2;
       m_stereo = header[22]==2 ? true : false;
       
@@ -160,6 +162,7 @@ class WaveIn
     ~WaveIn() { delete m_buffer; }
     
     int length() const { return m_length; }
+    int nativeSampleRate() const { return m_native_sample_rate; }
     float valueAt(float position)
     {
       return m_buffer[int(position*(m_length-1))];
@@ -168,6 +171,7 @@ class WaveIn
   private:
     float *m_buffer;
     int    m_length;
+    int    m_native_sample_rate;
     bool   m_stereo;
 };
 
@@ -559,8 +563,7 @@ Module *setupStream()
 
   char *patch_filename = "pad.pat";
   for(int i=1; i<argCount(); i++)
-    if(memcmp(getArg(i), "patch:", 6) == 0)
-      patch_filename = getArg(i)+6;
+    if(!strchr(getArg(i), ':')) patch_filename = getArg(i);
 
   FILE *in = fopen(patch_filename, "r");
   if(!in) throw CouldntOpenFileExcept(patch_filename);

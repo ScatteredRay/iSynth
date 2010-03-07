@@ -9,7 +9,7 @@ Quantize note_quant(note)
 NoteToFrequency freq(note_quant, "lydian")
 
 Multiply freq_offset(freq, 1.01)
-Sample osc("badpiano.wav", 44100, freq, touch, 0.784, 1)
+Sample osc("badpiano.wav", freq, touch, 0.784, 1)
 
 #filter
 Rescaler filter_offset(y, 1000, 5000)
