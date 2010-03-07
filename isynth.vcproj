@@ -4,7 +4,7 @@
 	Version="9.00"
 	Name="isynth"
 	ProjectGUID="{637BA34B-3C89-4760-9C67-5BB1BD7108BD}"
-	RootNamespace="rockguitar"
+	RootNamespace="isynth"
 	Keyword="Win32Proj"
 	TargetFrameworkVersion="131072"
 	>
