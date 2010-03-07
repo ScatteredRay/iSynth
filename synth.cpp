@@ -19,8 +19,7 @@
    - interpolated sample playback
    - switch
    - support for arbitrary parameter count
-     | sequencer (retriggerable)
-     \- oscillator hard sync
+     + sequencer (retriggerable)
    - support relative bending after touchdown
    - multiple intonations!  just, meantone, quarter tone, well-tempered, etc.
    - replay output from wave, to find nasty clicks (wave streamer)
@@ -50,6 +49,7 @@
    - output logging from command line
    - reimplemented: limiter, rectifier, clipper, stereo rotate, slew limiter
    - sample playback (wave reader)
+   - oscillator hard sync
 */
 #include "synth.h"
 
@@ -467,6 +467,7 @@ EXCEPTION_D(NotStereoExcept, ParseExcept, "Module not stereo")
 EXCEPTION_D(NotMonoExcept, ParseExcept, "Module not mono")
 EXCEPTION_D(TooFewParamsExcept, ParseExcept, "Too few parameters")
 EXCEPTION_D(TooManyParamsExcept_D, ParseExcept, "Too many parameters")
+EXCEPTION_D(ReusedModuleNameExcept, ParseExcept, "Reused Module Name")
 
 void addModule(char *definition)
 {
@@ -548,6 +549,7 @@ void addModule(char *definition)
   } while(t = strtok(0, delim));
   if(params.size() != g_module_infos[type]->parameterCount())
     throw TooFewParamsExcept(def_copy);
+  if(g_modules.count(name) > 0) throw ReusedModuleNameExcept(def_copy+name);
   g_modules[name] = g_module_infos[type]->instantiate(params);
 }
 

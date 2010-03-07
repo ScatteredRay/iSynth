@@ -6,7 +6,9 @@ class Saw : public Module
     Saw(vector<ModuleParam *> parameters)
     {
       m_frequency = parameters[0]->m_module;
+      m_retrigger = parameters[1]->m_module;
       m_position = 0;
+      m_last_trigger = 0;
 
     }
     static Module *create(vector<ModuleParam *> parameters)
@@ -21,12 +23,16 @@ class Saw : public Module
     {
       float *output = m_output;
       const float *frequency = m_frequency->output(last_fill, samples);
+      const float *retrigger = m_retrigger->output(last_fill, samples);
 
       for(int i=0; i<samples; i++)
       {
         *output++ = (m_position-0.5f)*2;
         m_position += frequency[i] / sample_rate;
         m_position -= int(m_position);
+        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+          m_position = 0;
+        m_last_trigger = retrigger[i];
       }
     }
 
@@ -42,7 +48,213 @@ class Saw : public Module
     }
   private:
     Module *m_frequency;
+    Module *m_retrigger;
     float m_position;
+    float m_last_trigger;
+};
+
+
+class Pulse : public Module
+{
+  public:
+    Pulse(vector<ModuleParam *> parameters)
+    {
+      m_frequency = parameters[0]->m_module;
+      m_pulsewidth = parameters[1]->m_module;
+      m_retrigger = parameters[2]->m_module;
+      m_position = 0;
+      m_last_trigger = 0;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new Pulse(parameters);
+    }
+
+    const char *moduleName() { return "Pulse"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *frequency = m_frequency->output(last_fill, samples);
+      const float *pulsewidth = m_pulsewidth->output(last_fill, samples);
+      const float *retrigger = m_retrigger->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = (m_position > pulsewidth[i]) ? -1.0f:1.0f;
+        m_position += frequency[i] / sample_rate;
+        m_position -= int(m_position);
+        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+          m_position = 0;
+        m_last_trigger = retrigger[i];
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      *out_min = -1;
+      *out_max =  1;
+    }
+
+    void validateInputRange()
+    {
+      validateWithin(*m_frequency, 0, 22050);
+    }
+  private:
+    Module *m_frequency;
+    Module *m_pulsewidth;
+    Module *m_retrigger;
+    float m_position;
+    float m_last_trigger;
+};
+
+
+class Sine : public Module
+{
+  public:
+    Sine(vector<ModuleParam *> parameters)
+    {
+      m_frequency = parameters[0]->m_module;
+      m_retrigger = parameters[1]->m_module;
+      m_position = 0;
+      m_last_trigger = 0;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new Sine(parameters);
+    }
+
+    const char *moduleName() { return "Sine"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *frequency = m_frequency->output(last_fill, samples);
+      const float *retrigger = m_retrigger->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = sin(m_position*2*pi);
+        m_position += frequency[i] / sample_rate;
+        m_position -= int(m_position);
+        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+          m_position = 0;
+        m_last_trigger = retrigger[i];
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      *out_min = -1;
+      *out_max =  1;
+    }
+
+    void validateInputRange()
+    {
+      validateWithin(*m_frequency, 0, 22050);
+    }
+  private:
+    Module *m_frequency;
+    Module *m_retrigger;
+    float m_position;
+    float m_last_trigger;
+};
+
+
+class Triangle : public Module
+{
+  public:
+    Triangle(vector<ModuleParam *> parameters)
+    {
+      m_frequency = parameters[0]->m_module;
+      m_retrigger = parameters[1]->m_module;
+      m_position = 0;
+      m_last_trigger = 0;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new Triangle(parameters);
+    }
+
+    const char *moduleName() { return "Triangle"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *frequency = m_frequency->output(last_fill, samples);
+      const float *retrigger = m_retrigger->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        if(m_position < .5f) *output++ = (m_position-0.25f) *  4;
+        else                 *output++ = (m_position-0.75f) * -4;
+        m_position += frequency[i] / sample_rate;
+        m_position -= int(m_position);
+        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+          m_position = 0;
+        m_last_trigger = retrigger[i];
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      *out_min = -1;
+      *out_max =  1;
+    }
+
+    void validateInputRange()
+    {
+      validateWithin(*m_frequency, 0, 22050);
+    }
+  private:
+    Module *m_frequency;
+    Module *m_retrigger;
+    float m_position;
+    float m_last_trigger;
+};
+
+
+class Noise : public Module
+{
+  public:
+    Noise(vector<ModuleParam *> parameters)
+    {
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new Noise(parameters);
+    }
+
+    const char *moduleName() { return "Noise"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = 2.0f*rand()/RAND_MAX - 1.0;
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      *out_min = -1;
+      *out_max =  1;
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
 };
 
 
@@ -117,186 +329,6 @@ class Sample : public Module
     WaveIn* m_sample;
     float m_rate_coefficient;
     float m_last_trigger;
-};
-
-
-class Pulse : public Module
-{
-  public:
-    Pulse(vector<ModuleParam *> parameters)
-    {
-      m_frequency = parameters[0]->m_module;
-      m_pulsewidth = parameters[1]->m_module;
-      m_position = 0;
-
-    }
-    static Module *create(vector<ModuleParam *> parameters)
-    {
-      return new Pulse(parameters);
-    }
-
-    const char *moduleName() { return "Pulse"; }
-
-    
-    void fill(float last_fill, int samples)
-    {
-      float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-      const float *pulsewidth = m_pulsewidth->output(last_fill, samples);
-
-      for(int i=0; i<samples; i++)
-      {
-        *output++ = (m_position > pulsewidth[i]) ? -1.0f:1.0f;
-        m_position += frequency[i] / sample_rate;
-        m_position -= int(m_position);
-      }
-    }
-
-    void getOutputRange(float *out_min, float *out_max)
-    {
-      *out_min = -1;
-      *out_max =  1;
-    }
-
-    void validateInputRange()
-    {
-      validateWithin(*m_frequency, 0, 22050);
-    }
-  private:
-    Module *m_frequency;
-    Module *m_pulsewidth;
-    float m_position;
-};
-
-
-class Sine : public Module
-{
-  public:
-    Sine(vector<ModuleParam *> parameters)
-    {
-      m_frequency = parameters[0]->m_module;
-      m_position = 0;
-
-    }
-    static Module *create(vector<ModuleParam *> parameters)
-    {
-      return new Sine(parameters);
-    }
-
-    const char *moduleName() { return "Sine"; }
-
-    
-    void fill(float last_fill, int samples)
-    {
-      float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-
-      for(int i=0; i<samples; i++)
-      {
-        *output++ = sin(m_position*2*pi);
-        m_position += frequency[i] / sample_rate;
-        m_position -= int(m_position);
-      }
-    }
-
-    void getOutputRange(float *out_min, float *out_max)
-    {
-      *out_min = -1;
-      *out_max =  1;
-    }
-
-    void validateInputRange()
-    {
-      validateWithin(*m_frequency, 0, 22050);
-    }
-  private:
-    Module *m_frequency;
-    float m_position;
-};
-
-
-class Triangle : public Module
-{
-  public:
-    Triangle(vector<ModuleParam *> parameters)
-    {
-      m_frequency = parameters[0]->m_module;
-      m_position = 0;
-
-    }
-    static Module *create(vector<ModuleParam *> parameters)
-    {
-      return new Triangle(parameters);
-    }
-
-    const char *moduleName() { return "Triangle"; }
-
-    
-    void fill(float last_fill, int samples)
-    {
-      float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-
-      for(int i=0; i<samples; i++)
-      {
-        if(m_position < .5f) *output++ = (m_position-0.25f) *  4;
-        else                 *output++ = (m_position-0.75f) * -4;
-        m_position += frequency[i] / sample_rate;
-        m_position -= int(m_position);
-      }
-    }
-
-    void getOutputRange(float *out_min, float *out_max)
-    {
-      *out_min = -1;
-      *out_max =  1;
-    }
-
-    void validateInputRange()
-    {
-      validateWithin(*m_frequency, 0, 22050);
-    }
-  private:
-    Module *m_frequency;
-    float m_position;
-};
-
-
-class Noise : public Module
-{
-  public:
-    Noise(vector<ModuleParam *> parameters)
-    {
-
-    }
-    static Module *create(vector<ModuleParam *> parameters)
-    {
-      return new Noise(parameters);
-    }
-
-    const char *moduleName() { return "Noise"; }
-
-    
-    void fill(float last_fill, int samples)
-    {
-      float *output = m_output;
-
-      for(int i=0; i<samples; i++)
-      {
-        *output++ = 2.0f*rand()/RAND_MAX - 1.0;
-      }
-    }
-
-    void getOutputRange(float *out_min, float *out_max)
-    {
-      *out_min = -1;
-      *out_max =  1;
-    }
-
-    void validateInputRange()
-    {
-    }
-  private:
 };
 
 
@@ -1363,20 +1395,24 @@ void fillModuleList()
 {
   g_module_infos["Saw"] = new ModuleInfo("Saw", Saw::create);
   g_module_infos["Saw"]->addParameter("frequency", "Module");
+  g_module_infos["Saw"]->addParameter("retrigger", "Module");
+  g_module_infos["Pulse"] = new ModuleInfo("Pulse", Pulse::create);
+  g_module_infos["Pulse"]->addParameter("frequency", "Module");
+  g_module_infos["Pulse"]->addParameter("pulsewidth", "Module");
+  g_module_infos["Pulse"]->addParameter("retrigger", "Module");
+  g_module_infos["Sine"] = new ModuleInfo("Sine", Sine::create);
+  g_module_infos["Sine"]->addParameter("frequency", "Module");
+  g_module_infos["Sine"]->addParameter("retrigger", "Module");
+  g_module_infos["Triangle"] = new ModuleInfo("Triangle", Triangle::create);
+  g_module_infos["Triangle"]->addParameter("frequency", "Module");
+  g_module_infos["Triangle"]->addParameter("retrigger", "Module");
+  g_module_infos["Noise"] = new ModuleInfo("Noise", Noise::create);
   g_module_infos["Sample"] = new ModuleInfo("Sample", Sample::create);
   g_module_infos["Sample"]->addParameter("sample_name", "string");
   g_module_infos["Sample"]->addParameter("frequency", "Module");
   g_module_infos["Sample"]->addParameter("retrigger", "Module");
   g_module_infos["Sample"]->addParameter("loop_start", "Module");
   g_module_infos["Sample"]->addParameter("loop_end", "Module");
-  g_module_infos["Pulse"] = new ModuleInfo("Pulse", Pulse::create);
-  g_module_infos["Pulse"]->addParameter("frequency", "Module");
-  g_module_infos["Pulse"]->addParameter("pulsewidth", "Module");
-  g_module_infos["Sine"] = new ModuleInfo("Sine", Sine::create);
-  g_module_infos["Sine"]->addParameter("frequency", "Module");
-  g_module_infos["Triangle"] = new ModuleInfo("Triangle", Triangle::create);
-  g_module_infos["Triangle"]->addParameter("frequency", "Module");
-  g_module_infos["Noise"] = new ModuleInfo("Noise", Noise::create);
   g_module_infos["Rescaler"] = new ModuleInfo("Rescaler", Rescaler::create);
   g_module_infos["Rescaler"]->addParameter("input", "Module");
   g_module_infos["Rescaler"]->addParameter("to_min", "float");
