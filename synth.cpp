@@ -64,6 +64,7 @@
 #include <vector>
 
 #include "exception.h"
+#include "file.h"
 #include "input.h"
 
 using namespace std;
@@ -75,8 +76,8 @@ using namespace std;
 #define _CRT_SECURE_NO_WARNINGS
 #pragma warning(disable:4244) // double conversion to float
 #pragma warning(disable:4305) // double conversion to float
-#pragma warning(disable:4996) // fopen() purportedly unsafe
 #pragma warning(disable:4267) // size_t conversion to int
+#pragma warning(disable:4996) // snprintf() purportedly unsafe
 
 const float pi = 3.1415926535897932384626f, e = 2.71828183f;
 const float note_0 = 8.1757989156;
@@ -109,8 +110,6 @@ struct
   { 0,            0 }
 };
 
-EXCEPTION_D(CouldntWriteExcept, Exception, "Couldn't open for writing")
-EXCEPTION_D(CouldntReadExcept,  Exception, "Couldn't open for reading")
 EXCEPTION_D(UnhandledWaveFormatException, Exception,
             "Can only handle 16-bit PCM .wav files")
 static unsigned char wave_header[] =
@@ -133,11 +132,10 @@ class WaveIn
   public:
     WaveIn(const string filename)
     {
-      FILE *in = fopen(filename.c_str(), "rb");
-      if(!in) throw CouldntReadExcept(filename);
-      
+      File in(filename, File::READ);
       static unsigned char header[sizeof(wave_header)];
-      fread(header, sizeof(wave_header), 1, in);
+      in.read(header, sizeof(wave_header), 1);
+
       if(memcmp(header, wave_header, 4) || memcmp(header+8, wave_header+8, 8) ||
          memcmp(header+20, wave_header+20, 2) ||
          memcmp(header+34, wave_header+34, 6))
@@ -150,14 +148,13 @@ class WaveIn
       
       m_buffer = new float[m_length];
       static short buf[1024];
-      for(int i=0; !feof(in) && i<m_length; i+=1024)
+      for(int i=0; !in.eof() && i<m_length; i+=1024)
       {
         int len = min(1024, m_length-i);
-        fread(buf, 2, len, in);
-        for(int j=0; j<len; j++)
-          m_buffer[i+j] = buf[j]/32768.0;
+        in.read(buf, 2, len);
+        for(int j=0; j<len; j++) m_buffer[i+j] = buf[j]/32768.0;
       }
-      fclose(in);
+      in.close();
     }
     ~WaveIn() { delete m_buffer; }
     
@@ -179,30 +176,26 @@ class WaveOut
 {
   public:
     WaveOut(const string filename, float scaler=32768, bool stereo=false)
-    : m_scaler(scaler), m_length(0)
+    : m_scaler(scaler), m_length(0), m_out(filename, File::WRITE)
     {
-      m_out = fopen(filename.c_str(), "wb");
-      if(!m_out) throw CouldntWriteExcept(filename);
       if(stereo) wave_header[22] = 0x02, wave_header[32] = 0x04;
       else       wave_header[22] = 0x01, wave_header[32] = 0x02;
-      fwrite(wave_header, sizeof(wave_header), 1, m_out);
+      m_out.write(wave_header, sizeof(wave_header), 1);
     }
 
     ~WaveOut() { close(); }
 
     void close()
     {
-      if(!m_out) return;
       updateLength();
-      fclose(m_out);
-      m_out = 0;
+      m_out.close();
     }
 
     void writeBuffer(const float *buffer, int size)
     {
       static short out[max_buffer_size];
       for(int i=0; i<size; i++) out[i] = short(buffer[i]*m_scaler);
-      fwrite(out, 2, size, m_out);
+      m_out.write(out, 2, size);
       m_length += size;
 
       updateLength();
@@ -212,23 +205,22 @@ class WaveOut
     void updateLength()
     {
       int chunklength = m_length*2;
-      fseek(m_out, 40, SEEK_SET);
-      fwrite(&chunklength, 4, 1, m_out);
+      m_out.seek(40);
+      m_out.write(&chunklength, 4, 1);
 
       chunklength += 36;
-      fseek(m_out, 4, SEEK_SET);
-      fwrite(&chunklength, 4, 1, m_out);
+      m_out.seek(4);
+      m_out.write(&chunklength, 4, 1);
 
-
-      fseek(m_out, 0, SEEK_END);
+      m_out.seekEnd();
     }
 
-    FILE *m_out;
+    File  m_out;
     float m_scaler;
-    int m_length;
+    int   m_length;
 };
 
-EXCEPTION_D(InvalidInputRangeExcept, Exception, "Invalid Input Range")
+EXCEPTION_D(InvalidInputRangeExcept,  Exception, "Invalid Input Range")
 EXCEPTION_D(InvalidOutputRangeExcept, Exception, "Invalid Output Range")
 
 class Module
@@ -567,17 +559,18 @@ Module *setupStream()
   for(int i=1; i<argCount(); i++)
     if(!strchr(getArg(i), ':')) patch_filename = getArg(i);
 
-  FILE *in = fopen(patch_filename, "r");
-  if(!in) throw CouldntOpenFileExcept(patch_filename);
+  File in(patch_filename, File::READ);
 
-  char s[256];
-  while(!feof(in))
+  string s;
+  while(!in.eof())
   {
-    fgets(s, 255, in);
-    addModule(s);
+    static char buf[256];
+    s = in.readLine();
+    strncpy(buf, s.c_str(), 255);
+    addModule(buf);
   }
   
-  fclose(in);
+  in.close();
 
   for(int i=1; i<argCount(); i++)
     if(memcmp(getArg(i), "log:", 4) == 0)

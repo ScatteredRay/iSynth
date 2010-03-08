@@ -148,7 +148,6 @@
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
-				OptimizeForWindows98="1"
 				LinkTimeCodeGeneration="1"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
@@ -196,6 +195,10 @@
 						GeneratePreprocessedFile="0"
 					/>
 				</FileConfiguration>
+			</File>
+			<File
+				RelativePath=".\file_win32.cpp"
+				>
 			</File>
 			<File
 				RelativePath=".\input_win32.cpp"
@@ -257,6 +260,10 @@
 			</File>
 			<File
 				RelativePath=".\exception.h"
+				>
+			</File>
+			<File
+				RelativePath=".\file.h"
 				>
 			</File>
 			<File
