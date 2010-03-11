@@ -18,15 +18,17 @@
    Todo:
    - interpolated sample playback
    - switch
+   - exponential envgen, DADSR, parameterized shape
+   - use yacc to parse modules?
    - support for arbitrary parameter count
+     + phase moduration?
      + sequencer (retriggerable)
+   - additional filters?  eq?
    - support relative bending after touchdown
    - multiple intonations!  just, meantone, quarter tone, well-tempered, etc.
    - replay output from wave, to find nasty clicks (wave streamer)
    - oscillator band-limiting (http://www.fly.net/~ant/bl-synth/ ?)
-   - additional filters?  eq?
    - reverb
-   - exponential envgen, DADSR, parameterized shape
    - multiplexing subsystem?
    Done:
    - x/y input
@@ -115,16 +117,16 @@ EXCEPTION_D(UnhandledWaveFormatException, Exception,
 static unsigned char wave_header[] =
 {
   'R', 'I', 'F', 'F',
-  0x00, 0x00, 0x00, 0x00, // wave size+36; patch later
+  0x00, 0x00, 0x00, 0x00, // wave size+36
   'W', 'A', 'V', 'E', 'f', 'm', 't', ' ',
   0x10, 0x00, 0x00, 0x00, 0x01, 0x00, // PCM
   0x01, 0x00, // channels
   0x44, 0xAC, 0x00, 0x00, // 44.1khz
   0x10, 0xB1, 0x02, 0x00, // 176400 bytes/sec
-  0x02, 0x00, // bytes per sample*channels
+  0x02, 0x00, // bytes per sample*channels (mono by default)
   0x10, 0x00, // 16 bits
   'd', 'a', 't', 'a',
-  0x00, 0x00, 0x00, 0x00, // wave size again
+  0x00, 0x00, 0x00, 0x00, // wave size
 };
 
 class WaveIn
@@ -139,7 +141,7 @@ class WaveIn
       if(memcmp(header, wave_header, 4) || memcmp(header+8, wave_header+8, 8) ||
          memcmp(header+20, wave_header+20, 2) ||
          memcmp(header+34, wave_header+34, 6))
-        throw UnhandledWaveFormatException(filename);
+        throw(UnhandledWaveFormatException(filename));
       
       memcpy(&m_native_sample_rate, header+24, 4);
       memcpy(&m_length, header+40, 4);      
@@ -277,7 +279,7 @@ class Module
         snprintf(error, 255,
                   "%s (%g, %g) for %s (%g, %g)",
                   input.moduleName(), inp_min, inp_max, moduleName(), min, max);
-        throw InvalidInputRangeExcept(error);
+        throw(InvalidInputRangeExcept(error));
       }
     }
 
@@ -293,7 +295,7 @@ class Module
           getOutputRange(&min, &max);
           snprintf(error, 255, "%s: %g <= %g <= %g",
                    moduleName(), min, m_output[i], max);
-          throw InvalidOutputRangeExcept(error);
+          throw(InvalidOutputRangeExcept(error));
         }
 /*        float upper_bound_distance = abs(max-m_output[i]);
         float lower_bound_distance = abs(min-m_output[i]);
@@ -422,7 +424,7 @@ class ModuleInfo
     const pair<string, string> parameter(unsigned int n) const
     {
       if(n>=m_parameters.size())
-        throw TooManyParamsExcept();
+        throw(TooManyParamsExcept());
       return m_parameters[n];
     }
     
@@ -448,18 +450,19 @@ EXCEPTION_D(ModuleExcept, Exception, "Module exception")
 map<string, Module *> g_modules;
 
 EXCEPTION_D(UnknownModuleTypeExcept, ParseExcept, "Unknown module type")
-EXCEPTION_D(ExpectingFloatExcept, ParseExcept, "Expecting a float")
-EXCEPTION_D(ExpectingIntExcept, ParseExcept, "Expecting an int")
-EXCEPTION_D(ExpectingModuleExcept, ParseExcept, "Expecting module name")
-EXCEPTION_D(ExpectingStringExcept, ParseExcept, "Expecting string")
-EXCEPTION_D(BadStringExcept, ParseExcept, "Bad string (no ,() or whitespace)")
-EXCEPTION_D(UnknownModuleExcept, ParseExcept, "Unknown module instance")
-EXCEPTION_D(UnknownTypeExcept, ParseExcept, "Unknown parameter type")
-EXCEPTION_D(NotStereoExcept, ParseExcept, "Module not stereo")
-EXCEPTION_D(NotMonoExcept, ParseExcept, "Module not mono")
-EXCEPTION_D(TooFewParamsExcept, ParseExcept, "Too few parameters")
-EXCEPTION_D(TooManyParamsExcept_D, ParseExcept, "Too many parameters")
-EXCEPTION_D(ReusedModuleNameExcept, ParseExcept, "Reused Module Name")
+EXCEPTION_D(ExpectingFloatExcept,    ParseExcept, "Expecting a float")
+EXCEPTION_D(ExpectingIntExcept,      ParseExcept, "Expecting an int")
+EXCEPTION_D(ExpectingModuleExcept,   ParseExcept, "Expecting module name")
+EXCEPTION_D(ExpectingStringExcept,   ParseExcept, "Expecting string")
+EXCEPTION_D(UnknownModuleExcept,     ParseExcept, "Unknown module instance")
+EXCEPTION_D(UnknownTypeExcept,       ParseExcept, "Unknown parameter type")
+EXCEPTION_D(NotStereoExcept,         ParseExcept, "Module not stereo")
+EXCEPTION_D(NotMonoExcept,           ParseExcept, "Module not mono")
+EXCEPTION_D(TooFewParamsExcept,      ParseExcept, "Too few parameters")
+EXCEPTION_D(TooManyParamsExcept_D,   ParseExcept, "Too many parameters")
+EXCEPTION_D(ReusedModuleNameExcept,  ParseExcept, "Reused Module Name")
+EXCEPTION_D(BadStringExcept,         ParseExcept,
+            "Bad string (no ,() or whitespace allowed)")
 
 void addModule(char *definition)
 {
@@ -479,7 +482,7 @@ void addModule(char *definition)
     {
       type = t;
       if(g_module_infos.count(type) == 0)
-        throw UnknownModuleTypeExcept(def_copy+t);
+        throw(UnknownModuleTypeExcept(def_copy+t));
       continue;
     }
     if(name == "") { name = t; continue; }
@@ -490,18 +493,18 @@ void addModule(char *definition)
     }
     catch(TooManyParamsExcept)
     {
-      throw TooManyParamsExcept_D(def_copy);    
+      throw(TooManyParamsExcept_D(def_copy));
     }
     ModuleParam *m = new ModuleParam();
     if(param_type=="float")
     {
       if(!isdigit(*t) && *t!='-' && *t!='.')
-        throw ExpectingFloatExcept(def_copy+t);
+        throw(ExpectingFloatExcept(def_copy+t));
       m->m_float = atof(t);
     }
     else if(param_type=="int")
     {
-      if(!isdigit(*t) && *t!='-') throw ExpectingIntExcept(def_copy+t);
+      if(!isdigit(*t) && *t!='-') throw(ExpectingIntExcept(def_copy+t));
       m->m_int = atoi(t);
     }
     else if(param_type=="Module")
@@ -510,43 +513,43 @@ void addModule(char *definition)
         m->m_module = new Constant(atof(t));
       else
       {
-        if(!g_modules.count(t)) throw UnknownModuleExcept(def_copy+t);
+        if(!g_modules.count(t)) throw(UnknownModuleExcept(def_copy+t));
         if(g_modules[t]->stereo())
-          throw NotMonoExcept(def_copy + t);
+          throw(NotMonoExcept(def_copy + t));
         m->m_module = g_modules[t];
       } 
     }
     else if(param_type=="StereoModule")
     {
       if(!isalpha(*t))
-        throw ExpectingModuleExcept(def_copy+t);
+        throw(ExpectingModuleExcept(def_copy+t));
       else
       {
-        if(!g_modules.count(t)) throw UnknownModuleExcept(def_copy+t);
+        if(!g_modules.count(t)) throw(UnknownModuleExcept(def_copy+t));
         if(!g_modules[t]->stereo())
-          throw NotStereoExcept(def_copy + t);
+          throw(NotStereoExcept(def_copy + t));
         m->m_stereomodule = (StereoModule *)g_modules[t];
       } 
     }
     else if(param_type=="string")
     {
-      if(*t != '"') throw ExpectingStringExcept(def_copy+t);
+      if(*t != '"') throw(ExpectingStringExcept(def_copy+t));
       char *end = strchr(t+1, '"');
-      if(!end) throw BadStringExcept(def_copy+t);
+      if(!end) throw(BadStringExcept(def_copy+t));
       *end = 0;
       m->m_string = t+1;
     }
-    else throw UnknownTypeExcept(def_copy+t);
+    else throw(UnknownTypeExcept(def_copy+t));
     params.push_back(m);
   } while(t = strtok(0, delim));
   if(params.size() != g_module_infos[type]->parameterCount())
-    throw TooFewParamsExcept(def_copy);
-  if(g_modules.count(name) > 0) throw ReusedModuleNameExcept(def_copy+name);
+    throw(TooFewParamsExcept(def_copy));
+  if(g_modules.count(name) > 0) throw(ReusedModuleNameExcept(def_copy+name));
   g_modules[name] = g_module_infos[type]->instantiate(params);
 }
 
-EXCEPTION(NoOutputModuleExcept, Exception, "No output module")
-EXCEPTION(OutputNotStereoExcept, Exception, "Output not stereo")
+EXCEPTION  (NoOutputModuleExcept,  Exception, "No output module")
+EXCEPTION  (OutputNotStereoExcept, Exception, "Output not stereo")
 EXCEPTION_D(CouldntOpenFileExcept, Exception, "Couldn't open file")
 
 Module *setupStream()
@@ -580,15 +583,15 @@ Module *setupStream()
       char *name = strtok(loglist, ",");
       do
       {
-        if(!g_modules.count(name)) throw UnknownModuleExcept(name);
+        if(!g_modules.count(name)) throw(UnknownModuleExcept(name));
         g_modules[name]->log(string(name)+".wav");
       }        
       while(name = strtok(0, ","));
     }
 
-  if(!g_modules.count("output")) throw NoOutputModuleExcept();
+  if(!g_modules.count("output")) throw(NoOutputModuleExcept());
   Module *output = g_modules["output"];
-  if(!output->stereo()) throw OutputNotStereoExcept();
+  if(!output->stereo()) throw(OutputNotStereoExcept());
   return output;
 }
 

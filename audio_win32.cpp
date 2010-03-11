@@ -18,9 +18,9 @@ void setupSound(unsigned int buffer_size)
 {
   IDirectSound8 *dsound;
   if(FAILED(DirectSoundCreate8(0, &dsound, 0)))
-    throw DsoundExcept("couldn't create dsound interface");
+    throw(DsoundExcept("couldn't create dsound interface"));
   if(FAILED(dsound->SetCooperativeLevel(GetConsoleWindow(), DSSCL_PRIORITY)))
-    throw DsoundExcept("couldn't set dsound cooperative level");
+    throw(DsoundExcept("couldn't set dsound cooperative level"));
     
   WAVEFORMATEX wave_format =
   {
@@ -45,16 +45,16 @@ void setupSound(unsigned int buffer_size)
   
   
   if(FAILED(dsound->CreateSoundBuffer(&buffer_descriptor, &buffer, 0)))
-    throw DsoundExcept("couldn't create dsound buffer");
+    throw(DsoundExcept("couldn't create dsound buffer"));
   
   IDirectSoundNotify *notify;
   if(FAILED(buffer->QueryInterface(IID_IDirectSoundNotify, 
                                    (void **)&notify)))
-    throw DsoundExcept("couldn't create dsound notify interface");
+    throw(DsoundExcept("couldn't create dsound notify interface"));
   
   notification_event = CreateEvent(0, false, false, 0);
   if(!notification_event)
-    throw DsoundExcept("couldn't create notification event");
+    throw(DsoundExcept("couldn't create notification event"));
   
   const int notify_count = 8;
   DSBPOSITIONNOTIFY notify_positions[notify_count];
@@ -65,21 +65,21 @@ void setupSound(unsigned int buffer_size)
   }
   
   if(FAILED(notify->SetNotificationPositions(notify_count, notify_positions)))
-    throw DsoundExcept("couldn't set dsound notification positions");
+    throw(DsoundExcept("couldn't set dsound notification positions"));
   
   void *write_buffer;
   DWORD write_buffer_size;
   if(FAILED(buffer->Lock(0, 0, &write_buffer, &write_buffer_size,
                          0, 0, DSBLOCK_ENTIREBUFFER)))
-    throw DsoundExcept("couldn't lock dsound buffer");
+    throw(DsoundExcept("couldn't lock dsound buffer"));
 
   memset(write_buffer, 0, write_buffer_size);
 
   if(FAILED(buffer->Unlock(write_buffer, write_buffer_size, 0, 0)))
-    throw DsoundExcept("couldn't unlock dsound buffer");
+    throw(DsoundExcept("couldn't unlock dsound buffer"));
 
   if(FAILED(buffer->Play(0, 0, DSBPLAY_LOOPING)))
-    throw DsoundExcept("couldn't play dsound buffer");
+    throw(DsoundExcept("couldn't play dsound buffer"));
 }
 
 void streamSound(unsigned int buffer_size)
@@ -121,7 +121,7 @@ void streamSound(unsigned int buffer_size)
         if(FAILED(buffer->Lock(next_write_position*4, write_length*4,
                                write_buffers,         write_buffer_sizes,
                                write_buffers+1,       write_buffer_sizes+1, 0)))
-          throw DsoundExcept("couldn't lock dsound buffer");
+          throw(DsoundExcept("couldn't lock dsound buffer"));
         
 //        printf("[%p, %d], [%p, %d]\n", write_buffers[0], write_buffer_sizes[0],
 //                                       write_buffers[1], write_buffer_sizes[1]);
@@ -133,7 +133,7 @@ void streamSound(unsigned int buffer_size)
    
         if(FAILED(buffer->Unlock(write_buffers[0], write_buffer_sizes[0], 
                                  write_buffers[1], write_buffer_sizes[1])))
-          throw DsoundExcept("couldn't unlock dsound buffer");
+          throw(DsoundExcept("couldn't unlock dsound buffer"));
           
         next_write_position += write_length;
       }      

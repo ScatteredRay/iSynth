@@ -16,7 +16,7 @@ bool File::open(const string &filename, int8 mode)
   m_mode     = mode;
   m_filename = filename;
 
-  if((m_mode & READ) && (m_mode & WRITE)) throw ExceptionReadWriteUnsup();
+  if((m_mode & READ) && (m_mode & WRITE)) throw(ExceptionReadWriteUnsup());
 
   char *m;
   if(m_mode & READ ) m="rb";
@@ -47,7 +47,7 @@ bool File::eof()
 
 int32 File::size()
 {
-  if(!m_file) throw ExceptionNoFileOpen();
+  if(!m_file) throw(ExceptionNoFileOpen());
 
   int32 size = 0, position = ftell(m_file);
    
@@ -61,24 +61,24 @@ int32 File::size()
 
 int32 File::read(void *data, int32 size, int32 count)
 {
-  if(!m_file) throw ExceptionNoFileOpen();
-  if(!(m_mode & READ)) throw ExceptionNotInReadMode(m_filename);
+  if(!m_file) throw(ExceptionNoFileOpen());
+  if(!(m_mode & READ)) throw(ExceptionNotInReadMode(m_filename));
 
   return (int32)(fread(data, size, count, m_file));
 }
 
 int32 File::write(const void *data, int32 size, int32 count)
 {
-  if(!m_file) throw ExceptionNoFileOpen();
-  if(!(m_mode & WRITE)) throw ExceptionNotInWriteMode(m_filename);
+  if(!m_file) throw(ExceptionNoFileOpen());
+  if(!(m_mode & WRITE)) throw(ExceptionNotInWriteMode(m_filename));
 
   return fwrite(data, size, count, m_file);
 }
 
 void File::printf(char *fmt, ...)
 {
-  if(!m_file)           throw ExceptionNoFileOpen();
-  if(!(m_mode & WRITE)) throw ExceptionNotInWriteMode(m_filename);
+  if(!m_file)           throw(ExceptionNoFileOpen());
+  if(!(m_mode & WRITE)) throw(ExceptionNotInWriteMode(m_filename));
 
   va_list args;
   va_start(args, fmt);

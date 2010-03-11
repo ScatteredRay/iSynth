@@ -343,7 +343,7 @@
       if(m_scale_name == scales[i].name)
         m_scale = (char *)(scales[i].steps);
     if(m_scale == 0)
-      throw ModuleExcept(string("Unknown scale: ")+m_scale_name);
+      throw(ModuleExcept(string("Unknown scale: ")+m_scale_name));
     for(int note=0; note<128; note++)
     {
       int closest = -128;

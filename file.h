@@ -47,7 +47,7 @@ class File
     File(const std::string &filename, int8 mode)
     : m_cached_size(-1)
     { 
-      if(!open(filename, mode)) throw ExceptionCouldntOpenFile(filename);
+      if(!open(filename, mode)) throw(ExceptionCouldntOpenFile(filename));
     }
 
     /// @brief Close open file, if any.
