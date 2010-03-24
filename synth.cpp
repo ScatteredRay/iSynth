@@ -74,9 +74,9 @@
 
 using namespace std;
 
-#ifndef __APPLE__
+#ifdef _WIN32
 #define snprintf _snprintf
-#endif //__APPLE__
+#endif //_WIN32
 
 #define _CRT_SECURE_NO_WARNINGS
 #pragma warning(disable:4244) // double conversion to float

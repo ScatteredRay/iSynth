@@ -80,7 +80,7 @@ class File
     void seekForward(int32 offset);
 
     /// @brief Sets the cursor to offset from the end of the file.
-    void File::seekEnd(int32 offset=0);
+    void seekEnd(int32 offset=0);
 
     /// @return Current cursor position.
     int32 pos();

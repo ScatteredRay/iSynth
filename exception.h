@@ -6,6 +6,16 @@
 
 #include <string>
 
+#ifdef ANDROID
+#include <android/log.h>
+#define throw(e) ({ \
+    __android_log_write(ANDROID_LOG_ERROR, "iSynth", e.describe().c_str()); \
+    exit(EXIT_FAILURE); \
+})
+#define try  
+#define catch(e) if(0)
+#endif //ANDROID
+
 /// Exception base class.
 /** Exception is the pure abstract base class (interface) for the engine's
     exception subclasses.
