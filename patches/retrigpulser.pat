@@ -33,8 +33,11 @@ Multiply cutoff(cutoff_y, cutoff_env)
 Add cutoff_offset(cutoff, freq)
 Filter filter(osc, cutoff_offset, 0.7)
 
+Rescaler bits(y, 4, 64)
+BitCrusher crushed(filter, bits)
+
 #amp
-Multiply notes(filter, env)
+Multiply notes(crushed, env)
 
 #panning
-PingPongDelay output(0.1, 0.2, notes, 0.4, 1.0, 0.9)
+PingPongDelay output(0.1, 0.2, notes, 0.0, 1.0, 0.9)

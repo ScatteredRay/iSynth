@@ -928,6 +928,49 @@ class Clipper : public Module
 };
 
 
+class BitCrusher : public Module
+{
+  public:
+    BitCrusher(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_module;
+      m_range = parameters[1]->m_module;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new BitCrusher(parameters);
+    }
+
+    const char *moduleName() { return "BitCrusher"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+      const float *range = m_range->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = int(input[i] * range[i]) / range[i];
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      m_input->getOutputRange(out_min, out_max);
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
+    Module *m_input;
+    Module *m_range;
+};
+
+
 class SlewLimiter : public Module
 {
   public:
@@ -1448,6 +1491,9 @@ void fillModuleList()
   g_module_infos["Clipper"]->addParameter("input", "Module");
   g_module_infos["Clipper"]->addParameter("min", "Module");
   g_module_infos["Clipper"]->addParameter("max", "Module");
+  g_module_infos["BitCrusher"] = new ModuleInfo("BitCrusher", BitCrusher::create);
+  g_module_infos["BitCrusher"]->addParameter("input", "Module");
+  g_module_infos["BitCrusher"]->addParameter("range", "Module");
   g_module_infos["SlewLimiter"] = new ModuleInfo("SlewLimiter", SlewLimiter::create);
   g_module_infos["SlewLimiter"]->addParameter("input", "Module");
   g_module_infos["SlewLimiter"]->addParameter("up", "float");

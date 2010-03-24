@@ -319,6 +319,13 @@
     *out_min = min(min_min, max_min), *out_max = max(min_max, max_max);
 @
 
+@module BitCrusher(input, range):
+  fill:
+    *output++ = int(input[i] * range[i]) / range[i];
+  output_range:
+    m_input->getOutputRange(out_min, out_max);
+@
+
 @module SlewLimiter(input, float up, float down):
   members:
     float last = 0
