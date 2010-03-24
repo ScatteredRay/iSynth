@@ -641,7 +641,8 @@ class EnvelopeGenerator : public Module
       m_sus = parameters[3]->m_float;
       m_rel = parameters[4]->m_float;
       m_position = 0;
-      m_rate = 0;
+      m_coefficient = 0;
+      m_destination = 0;
       m_held = false;
       m_stage = 0;
 
@@ -653,6 +654,11 @@ class EnvelopeGenerator : public Module
 
     const char *moduleName() { return "EnvelopeGenerator"; }
     enum { IDLE = 0, ATTACK, DECAY, SUSTAIN, RELEASE };
+    float coefficient(float time)
+    {
+      return (360481000.0*pow(time, 1.1f) + 1) /
+             (360481000.0*pow(time, 1.1f) + 100000);
+    }
 
     
     void fill(float last_fill, int samples)
@@ -666,46 +672,40 @@ class EnvelopeGenerator : public Module
         {
           if(gate[i] > 0.9)
           {
-            m_stage = ATTACK;
-            m_rate = (1-m_position) / (sample_rate*m_att+1);
-            m_held = true;
+            m_stage       = ATTACK;
+            m_coefficient = coefficient(m_att);
+            m_destination = 1;
+            m_held        = true;
           }
         }
         else
         {
           if(gate[i] < 0.1)
           {
-            m_stage = RELEASE;
-            m_rate = -m_position / (sample_rate*m_rel+1);
-            m_held = false;
+            m_stage       = RELEASE;
+            m_coefficient = coefficient(m_rel);
+            m_destination = 0;
+            m_held        = false;
           }
         }
-        m_position += m_rate;
+        m_position = m_position * m_coefficient + m_destination * (1-m_coefficient);
         switch(m_stage)
         {
-          case IDLE: case SUSTAIN: break;
           case ATTACK:
-            if(m_position >= 1)
+            if(m_position >= 0.999)
             {
-              m_stage = DECAY;
-              m_position = 1;
-              m_rate = (m_sus-1) / (sample_rate*m_dec+1);
-            }
-            break;
-          case DECAY:
-            if(m_position <= m_sus)
-            {
-              m_stage = SUSTAIN;
-              m_position = m_sus;
-              m_rate = 0;
+              m_stage       = DECAY;
+              m_coefficient = coefficient(m_dec);
+              m_destination = m_sus;
             }
             break;
           case RELEASE:
-            if(m_position <= 0.0)
+            if(m_position <= 0.00001)
             {
-              m_stage = IDLE;
-              m_position = 0.0;
-              m_rate = 0.0;
+              m_stage       = IDLE;
+              m_position    = 0;
+              m_destination = 0;
+              m_coefficient = 0;
             }
             break;
         }
@@ -730,7 +730,8 @@ class EnvelopeGenerator : public Module
     float m_sus;
     float m_rel;
     float m_position;
-    float m_rate;
+    float m_coefficient;
+    float m_destination;
     bool m_held;
     int m_stage;
 };

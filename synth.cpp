@@ -16,9 +16,11 @@
    reverbing each channel individually.
 
    Todo:
+   - decimation
    - interpolated sample playback
    - switch
    - exponential envgen, DADSR, parameterized shape
+   - wave terrain
    - use yacc to parse modules?
    - support for arbitrary parameter count
      + phase moduration?
@@ -60,6 +62,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <sstream>
 #include <map>
 #include <string>
 #include <utility>
@@ -261,12 +264,16 @@ class Module
       return m_output;
     }
 
-    virtual void log(const string filename)
+    virtual void createLog(const string filename)
     {
       float min, max;
       getOutputRange(&min, &max);
+
+      ostringstream fn;
+      fn << filename << " (" << min << " to " << max << ").wav";
+
       if(-min > max) max = -min;
-      if(!m_waveout) m_waveout = new WaveOut(filename, 32767/max);
+      if(!m_waveout) m_waveout = new WaveOut(fn.str(), 32767/max);
     }
 
     void validateWithin(Module &input, float min, float max)
@@ -335,12 +342,14 @@ class StereoModule : public Module
       return m_output;
     }
 
-    void log(const string filename)
+    void createLog(const string filename)
     {
       float min, max;
       getOutputRange(&min, &max);
+      ostringstream fn;
+      fn << filename << " (" << min << " to " << max << ").wav";
       if(-min > max) max = -min;
-      if(!m_waveout) m_waveout = new WaveOut(filename, 32767/max, true);
+      if(!m_waveout) m_waveout = new WaveOut(fn.str(), 32767/max, true);
     }
 
   protected:
@@ -584,7 +593,7 @@ Module *setupStream()
       do
       {
         if(!g_modules.count(name)) throw(UnknownModuleExcept(name));
-        g_modules[name]->log(string(name)+".wav");
+        g_modules[name]->createLog(name);
       }        
       while(name = strtok(0, ","));
     }

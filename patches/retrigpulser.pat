@@ -6,7 +6,7 @@ Input touch(2)
 #note
 Rescaler note(x, 36, 60)
 Quantize note_quant(note)
-EnvelopeGenerator pitch(touch, 0.0001, 0.05, 0, 1)
+EnvelopeGenerator pitch(touch, 0.001, 0.05, 0, 1)
 Rescaler pitch_add(pitch, 0, 12)
 Add note_offset(note_quant, pitch_add)
 NoteToFrequency note_freq(note_offset, "minor")
@@ -37,4 +37,4 @@ Filter filter(osc, cutoff_offset, 0.7)
 Multiply notes(filter, env)
 
 #panning
-PingPongDelay output(0.1, 0.2, notes, 0.5, 1.0, 0.9)
+PingPongDelay output(0.1, 0.2, notes, 0.4, 1.0, 0.9)

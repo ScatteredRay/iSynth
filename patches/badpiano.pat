@@ -17,7 +17,7 @@ Add filter_freq(freq, filter_offset)
 Filter filter(osc, filter_freq, 0)
 
 #amp
-EnvelopeGenerator env(touch, 0.0001, 5, 0, 0.1)
+EnvelopeGenerator env(touch, 0.0001, 10, 0, 0.1)
 Rescaler velocity(y, 0.3, 1)
 Multiply env_vel(env, velocity)
 Multiply notes(filter, env_vel)

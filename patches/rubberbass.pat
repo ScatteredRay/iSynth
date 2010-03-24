@@ -24,7 +24,7 @@ Pulse osc2(freq_detuned, 0.8, 0)
 Add oscs(osc1_rect, osc2)
 
 #filter
-EnvelopeGenerator env(touch, 0.01, 0.7, 0.5, 0.1)
+EnvelopeGenerator env(touch, 0.03, 4, 0.5, 0.1)
 Rescaler cutoff_env(env, 100, 700)
 Rescaler cutoff_y(y, 0.25, 1)
 Multiply cutoff(cutoff_y, cutoff_env)
@@ -35,4 +35,4 @@ Filter filter(oscs, cutoff_offset, 0.95)
 Multiply notes(filter, env)
 
 #panning
-PingPongDelay output(0.1, 0.2, notes, 0.5, 1.0, 0.9)
+PingPongDelay output(0.1, 0.2, notes, 0.2, 1.0, 0.9)

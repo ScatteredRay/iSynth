@@ -20,7 +20,7 @@ Rescaler vibrato(vibrato_unit, 0.975, 1.025)
 Multiply freq(note_freq, vibrato)
 
 #noise
-EnvelopeGenerator pw_unit(touch, 1, 1, 0.9, 0.03)
+EnvelopeGenerator pw_unit(touch, 4, 1, 0.9, 0.03)
 Rescaler pw(pw_unit, 0.5, 0.05)
 Add freq_detuned(freq, 1)
 Pulse osc_1(freq, pw, 0)
@@ -28,12 +28,12 @@ Pulse osc_2(freq_detuned, pw, 0)
 Add osc_mix(osc_1, osc_2)
 
 #filter
-EnvelopeGenerator cutoff_env_unit(touch, 0.01, 1, 0, 0.03)
+EnvelopeGenerator cutoff_env_unit(touch, 0.02, 4, 0, 0.04)
 Rescaler cutoff_env(cutoff_env_unit, 1000, 2000)
 Rescaler cutoff_y(y, 0.5, 1)
 Multiply cutoff(cutoff_y, cutoff_env)
 Filter filter(osc_mix, cutoff, 0.7)
-EnvelopeGenerator vol(touch, 0.1, 0.5, 0.3, 0.03)
+EnvelopeGenerator vol(touch, 0.6, 1.0, 0.3, 0.03)
 Multiply notes(filter, vol)
 
 #panning
