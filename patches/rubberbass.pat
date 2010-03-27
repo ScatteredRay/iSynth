@@ -10,17 +10,17 @@ NoteToFrequency note_freq(note_quant, "lydian")
 SlewLimiter note_freq_sl(note_freq, .0005, .0005)
 
 #vibrato
-Sine vibrato_lfo(3, 0)
+Sine vibrato_lfo(3)
 EnvelopeGenerator vibrato_env(touch, 2, 1, 1, 1)
 Multiply vibrato_enveloped(vibrato_lfo, vibrato_env)
 Rescaler vibrato(vibrato_enveloped, 0.985, 1.015)
 Multiply freq(note_freq_sl, vibrato)
 
 #noise
-Sine osc1(freq, 0)
+Sine osc1(freq)
 Rectifier osc1_rect(osc1)
 Add freq_detuned(freq, 0.3)
-Pulse osc2(freq_detuned, 0.8, 0)
+Pulse osc2(freq_detuned, 0.8)
 Add oscs(osc1_rect, osc2)
 
 #filter

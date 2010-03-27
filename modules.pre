@@ -1,4 +1,4 @@
-@module Saw(frequency, retrigger):
+@module Saw(frequency, retrigger=0):
   members:
     float position = 0, last_trigger = 0
   fill:
@@ -15,7 +15,7 @@
     frequency: 0, 22050
 @
 
-@module Pulse(frequency, pulsewidth, retrigger):
+@module Pulse(frequency, pulsewidth=0.5, retrigger=0):
   members:
     float position = 0, last_trigger = 0
   fill:
@@ -32,7 +32,7 @@
     frequency: 0, 22050
 @
 
-@module Sine(frequency, retrigger):
+@module Sine(frequency, retrigger=0):
   members:
     float position = 0, last_trigger = 0
   fill:
@@ -49,7 +49,7 @@
     frequency: 0, 22050
 @
 
-@module Triangle(frequency, retrigger):
+@module Triangle(frequency, retrigger=0):
   members:
     float position = 0, last_trigger = 0
   fill:
@@ -75,7 +75,7 @@
     *out_max =  1;
 @
 
-@module Sample(string sample_name, frequency, retrigger, loop_start, loop_end):
+@module Sample(string sample_name, frequency, retrigger=0, loop_start=0, loop_end=1):
   members:
     float   position         = 0
     WaveIn* sample           = 0
@@ -280,7 +280,7 @@
   output_range:
     m_source->getOutputRange(out_min, out_max);
   input_range:
-    trigger: 0, 1
+    trigger: -1, 1
   fill:
     if(m_last_trigger < 0.1 && trigger[i] > 0.9)
       m_value = source[i];
@@ -368,7 +368,9 @@
       return pow(2.0, m_closest_notes[int(note)]/12.0) * note_0;
     }
   output_range:
-    *out_min = freqFromNote(1), *out_max = freqFromNote(127);
+    float min, max;
+    m_input->getOutputRange(&min, &max);
+    *out_min = freqFromNote(min), *out_max = freqFromNote(max);
   input_range:
     input: 0, 127
   fill:

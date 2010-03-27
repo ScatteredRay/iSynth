@@ -12,7 +12,7 @@ NoteToFrequency note_freq(note_quant, "mixolydian")
 
 #vibrato
 EnvelopeGenerator vibrato_env(touch, 2, 1, 1, 1)
-Sine vibrato_lfo(5, 0)
+Sine vibrato_lfo(5)
 Multiply vibrato_enveloped(vibrato_lfo, vibrato_env)
 Rescaler vibrato_y(y, 0, 1)
 Multiply vibrato_unit(vibrato_enveloped, vibrato_y)
@@ -23,8 +23,8 @@ Multiply freq(note_freq, vibrato)
 EnvelopeGenerator pw_unit(touch, 4, 1, 0.9, 0.03)
 Rescaler pw(pw_unit, 0.5, 0.05)
 Add freq_detuned(freq, 1)
-Pulse osc_1(freq, pw, 0)
-Pulse osc_2(freq_detuned, pw, 0)
+Pulse osc_1(freq, pw)
+Pulse osc_2(freq_detuned, pw)
 Add osc_mix(osc_1, osc_2)
 
 #filter

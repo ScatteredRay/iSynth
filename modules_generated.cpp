@@ -779,7 +779,7 @@ class SampleAndHold : public Module
 
     void validateInputRange()
     {
-      validateWithin(*m_trigger, 0, 1);
+      validateWithin(*m_trigger, -1, 1);
     }
   private:
     Module *m_source;
@@ -1074,7 +1074,9 @@ class NoteToFrequency : public Module
 
     void getOutputRange(float *out_min, float *out_max)
     {
-      *out_min = freqFromNote(1), *out_max = freqFromNote(127);
+      float min, max;
+      m_input->getOutputRange(&min, &max);
+      *out_min = freqFromNote(min), *out_max = freqFromNote(max);
     }
 
     void validateInputRange()
@@ -1439,24 +1441,24 @@ void fillModuleList()
 {
   g_module_infos["Saw"] = new ModuleInfo("Saw", Saw::create);
   g_module_infos["Saw"]->addParameter("frequency", "Module");
-  g_module_infos["Saw"]->addParameter("retrigger", "Module");
+  g_module_infos["Saw"]->addParameter("retrigger", "Module", 0);
   g_module_infos["Pulse"] = new ModuleInfo("Pulse", Pulse::create);
   g_module_infos["Pulse"]->addParameter("frequency", "Module");
-  g_module_infos["Pulse"]->addParameter("pulsewidth", "Module");
-  g_module_infos["Pulse"]->addParameter("retrigger", "Module");
+  g_module_infos["Pulse"]->addParameter("pulsewidth", "Module", 0.5);
+  g_module_infos["Pulse"]->addParameter("retrigger", "Module", 0);
   g_module_infos["Sine"] = new ModuleInfo("Sine", Sine::create);
   g_module_infos["Sine"]->addParameter("frequency", "Module");
-  g_module_infos["Sine"]->addParameter("retrigger", "Module");
+  g_module_infos["Sine"]->addParameter("retrigger", "Module", 0);
   g_module_infos["Triangle"] = new ModuleInfo("Triangle", Triangle::create);
   g_module_infos["Triangle"]->addParameter("frequency", "Module");
-  g_module_infos["Triangle"]->addParameter("retrigger", "Module");
+  g_module_infos["Triangle"]->addParameter("retrigger", "Module", 0);
   g_module_infos["Noise"] = new ModuleInfo("Noise", Noise::create);
   g_module_infos["Sample"] = new ModuleInfo("Sample", Sample::create);
   g_module_infos["Sample"]->addParameter("sample_name", "string");
   g_module_infos["Sample"]->addParameter("frequency", "Module");
-  g_module_infos["Sample"]->addParameter("retrigger", "Module");
-  g_module_infos["Sample"]->addParameter("loop_start", "Module");
-  g_module_infos["Sample"]->addParameter("loop_end", "Module");
+  g_module_infos["Sample"]->addParameter("retrigger", "Module", 0);
+  g_module_infos["Sample"]->addParameter("loop_start", "Module", 0);
+  g_module_infos["Sample"]->addParameter("loop_end", "Module", 1);
   g_module_infos["Rescaler"] = new ModuleInfo("Rescaler", Rescaler::create);
   g_module_infos["Rescaler"]->addParameter("input", "Module");
   g_module_infos["Rescaler"]->addParameter("to_min", "float");

@@ -16,10 +16,9 @@
    reverbing each channel individually.
 
    Todo:
-   - decimation
    - interpolated sample playback
    - switch
-   - exponential envgen, DADSR, parameterized shape
+   - DADSR, parameterized shape
    - wave terrain
    - use yacc to parse modules?
    - support for arbitrary parameter count
@@ -54,6 +53,8 @@
    - reimplemented: limiter, rectifier, clipper, stereo rotate, slew limiter
    - sample playback (wave reader)
    - oscillator hard sync
+   - exponential envgen
+   - bitcrusher
 */
 #include "synth.h"
 
@@ -419,18 +420,39 @@ class Input : public Module
 EXCEPTION(ParseExcept, Exception, "Parse Error")
 EXCEPTION(TooManyParamsExcept, ParseExcept, "Too many parameters")
 
+struct ModuleParamInfo
+{
+  string name, type;
+  bool   hasdefault;
+  float  defaultvalue;
+};
+
 class ModuleInfo
 {
   public:
     ModuleInfo(string name, Module *(*instantiator)(vector<ModuleParam *>))
     : m_name(name), m_instantiator(instantiator) {}
 
-    void addParameter(string name, string type)
+    void addParameter(string name, string type, float defaultvalue)
     {
-      m_parameters.push_back(pair<string, string>(name, type));
+      ModuleParamInfo m;
+      m.name = name;
+      m.type = type;
+      m.hasdefault = true;
+      m.defaultvalue = defaultvalue;
+      m_parameters.push_back(m);
     }
     
-    const pair<string, string> parameter(unsigned int n) const
+    void addParameter(string name, string type)
+    {
+      ModuleParamInfo m;
+      m.name = name;
+      m.type = type;
+      m.hasdefault = false;
+      m_parameters.push_back(m);
+    }
+    
+    const ModuleParamInfo parameter(unsigned int n) const
     {
       if(n>=m_parameters.size())
         throw(TooManyParamsExcept());
@@ -446,7 +468,7 @@ class ModuleInfo
     
   private:
     string m_name;
-    vector<pair<string, string> > m_parameters; // name, type
+    vector<ModuleParamInfo> m_parameters;
     Module *(*m_instantiator)(vector<ModuleParam *> parameters);
 };
 
@@ -498,7 +520,7 @@ void addModule(char *definition)
     string param_type;
     try
     {
-      param_type = g_module_infos[type]->parameter(params.size()).second;
+      param_type = g_module_infos[type]->parameter(params.size()).type;
     }
     catch(TooManyParamsExcept)
     {
@@ -551,6 +573,17 @@ void addModule(char *definition)
     else throw(UnknownTypeExcept(def_copy+t));
     params.push_back(m);
   } while(t = strtok(0, delim));
+
+  while(params.size() != g_module_infos[type]->parameterCount())
+  {
+    if(!g_module_infos[type]->parameter(params.size()).hasdefault) break;
+    
+    ModuleParam *m = new ModuleParam();
+    m->m_module =
+      new Constant(g_module_infos[type]->parameter(params.size()).defaultvalue);
+    params.push_back(m);
+  }
+  
   if(params.size() != g_module_infos[type]->parameterCount())
     throw(TooFewParamsExcept(def_copy));
   if(g_modules.count(name) > 0) throw(ReusedModuleNameExcept(def_copy+name));
