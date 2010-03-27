@@ -32,11 +32,11 @@
     frequency: 0, 22050
 @
 
-@module Sine(frequency, retrigger=0):
+@module Sine(frequency, retrigger=0, phase_offset=0):
   members:
     float position = 0, last_trigger = 0
   fill:
-    *output++ = sin(m_position*2*pi);
+    *output++ = sin((m_position+phase_offset[i])*2*pi);
     m_position += frequency[i] / sample_rate;
     m_position -= int(m_position);
     if(m_last_trigger < 0.1 && retrigger[i] > 0.9)

@@ -118,6 +118,7 @@ class Sine : public Module
     {
       m_frequency = parameters[0]->m_module;
       m_retrigger = parameters[1]->m_module;
+      m_phase_offset = parameters[2]->m_module;
       m_position = 0;
       m_last_trigger = 0;
 
@@ -135,10 +136,11 @@ class Sine : public Module
       float *output = m_output;
       const float *frequency = m_frequency->output(last_fill, samples);
       const float *retrigger = m_retrigger->output(last_fill, samples);
+      const float *phase_offset = m_phase_offset->output(last_fill, samples);
 
       for(int i=0; i<samples; i++)
       {
-        *output++ = sin(m_position*2*pi);
+        *output++ = sin((m_position+phase_offset[i])*2*pi);
         m_position += frequency[i] / sample_rate;
         m_position -= int(m_position);
         if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
@@ -160,6 +162,7 @@ class Sine : public Module
   private:
     Module *m_frequency;
     Module *m_retrigger;
+    Module *m_phase_offset;
     float m_position;
     float m_last_trigger;
 };
@@ -1449,6 +1452,7 @@ void fillModuleList()
   g_module_infos["Sine"] = new ModuleInfo("Sine", Sine::create);
   g_module_infos["Sine"]->addParameter("frequency", "Module");
   g_module_infos["Sine"]->addParameter("retrigger", "Module", 0);
+  g_module_infos["Sine"]->addParameter("phase_offset", "Module", 0);
   g_module_infos["Triangle"] = new ModuleInfo("Triangle", Triangle::create);
   g_module_infos["Triangle"]->addParameter("frequency", "Module");
   g_module_infos["Triangle"]->addParameter("retrigger", "Module", 0);

@@ -22,7 +22,6 @@
    - wave terrain
    - use yacc to parse modules?
    - support for arbitrary parameter count
-     + phase moduration?
      + sequencer (retriggerable)
    - additional filters?  eq?
    - support relative bending after touchdown
@@ -55,6 +54,8 @@
    - oscillator hard sync
    - exponential envgen
    - bitcrusher
+   - default parameter support
+   - phase modulation
 */
 #include "synth.h"
 
