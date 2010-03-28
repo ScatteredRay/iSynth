@@ -45,7 +45,7 @@ class File
     /** @param filename Name of file to open.
         @param mode Mode in which to open the file. */
     File(const std::string &filename, int8 mode)
-    : m_cached_size(-1)
+    : m_file(0), m_cached_size(-1), m_mode(0)
     { 
       if(!open(filename, mode)) throw(ExceptionCouldntOpenFile(filename));
     }
