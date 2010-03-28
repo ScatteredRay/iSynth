@@ -406,6 +406,18 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath=".\patches\toms.pat"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
+					/>
+				</FileConfiguration>
+			</File>
 		</Filter>
 	</Files>
 	<Globals>

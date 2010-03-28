@@ -261,6 +261,51 @@ class Noise : public Module
 };
 
 
+class Within : public Module
+{
+  public:
+    Within(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_module;
+      m_min = parameters[1]->m_float;
+      m_max = parameters[2]->m_float;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new Within(parameters);
+    }
+
+    const char *moduleName() { return "Within"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = (input[i]>=m_min && input[i]<=m_max) ? 1 : 0;
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      *out_min = 0;
+      *out_max = 1;
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
+    Module *m_input;
+    float m_min;
+    float m_max;
+};
+
+
 class Sample : public Module
 {
   public:
@@ -1159,6 +1204,49 @@ class NoteToFrequency : public Module
 };
 
 
+class MixDown : public Module
+{
+  public:
+    MixDown(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_stereomodule;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new MixDown(parameters);
+    }
+
+    const char *moduleName() { return "MixDown"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = *input++ + *input++;
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      float min, max;
+      m_input->getOutputRange(&min, &max);
+      *out_min = min*2;
+      *out_max = max*2;
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
+    StereoModule *m_input;
+};
+
+
 class Pan : public StereoModule
 {
   public:
@@ -1522,6 +1610,10 @@ void fillModuleList()
   g_module_infos["Triangle"]->addParameter("frequency", "Module");
   g_module_infos["Triangle"]->addParameter("retrigger", "Module", 0);
   g_module_infos["Noise"] = new ModuleInfo("Noise", Noise::create);
+  g_module_infos["Within"] = new ModuleInfo("Within", Within::create);
+  g_module_infos["Within"]->addParameter("input", "Module");
+  g_module_infos["Within"]->addParameter("min", "float");
+  g_module_infos["Within"]->addParameter("max", "float");
   g_module_infos["Sample"] = new ModuleInfo("Sample", Sample::create);
   g_module_infos["Sample"]->addParameter("sample_name", "string");
   g_module_infos["Sample"]->addParameter("frequency", "Module");
@@ -1576,6 +1668,8 @@ void fillModuleList()
   g_module_infos["NoteToFrequency"] = new ModuleInfo("NoteToFrequency", NoteToFrequency::create);
   g_module_infos["NoteToFrequency"]->addParameter("input", "Module");
   g_module_infos["NoteToFrequency"]->addParameter("scale_name", "string");
+  g_module_infos["MixDown"] = new ModuleInfo("MixDown", MixDown::create);
+  g_module_infos["MixDown"]->addParameter("input", "StereoModule");
   g_module_infos["Pan"] = new ModuleInfo("Pan", Pan::create);
   g_module_infos["Pan"]->addParameter("input", "Module");
   g_module_infos["Pan"]->addParameter("position", "Module");

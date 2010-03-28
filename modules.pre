@@ -75,6 +75,14 @@
     *out_max =  1;
 @
 
+@module Within(input, float min, float max):
+  fill:
+    *output++ = (input[i]>=m_min && input[i]<=m_max) ? 1 : 0;
+  output_range:
+    *out_min = 0;
+    *out_max = 1;
+@
+
 @module Sample(string sample_name, frequency, retrigger=0, loop_start=0, loop_end=1):
   members:
     float   position         = 0
@@ -397,6 +405,16 @@
     input: 0, 127
   fill:
     *output++ = freqFromNote(input[i]);
+@
+
+@module MixDown(StereoModule input):
+  fill:
+    *output++ = *input++ + *input++;
+  output_range:
+    float min, max;
+    m_input->getOutputRange(&min, &max);
+    *out_min = min*2;
+    *out_max = max*2;
 @
 
 @stereomodule Pan(input, position):
