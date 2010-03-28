@@ -275,6 +275,18 @@
 			Name="stuff we don&apos;t build"
 			>
 			<File
+				RelativePath=".\patches\acousticdrums.pat"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath=".\patches\badpiano.pat"
 				>
 				<FileConfiguration

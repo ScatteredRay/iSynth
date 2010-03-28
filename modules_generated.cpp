@@ -305,7 +305,10 @@ class Sample : public Module
           m_position = 0;
         m_last_trigger = retrigger[i];
         if(m_position > loop_end[i])
+        {
           m_position -= (loop_end[i] - loop_start[i]);
+          if(m_position > loop_end[i]) m_position = loop_end[i];
+        }
       }
     }
 
