@@ -1,4 +1,4 @@
-@module Saw(frequency, retrigger):
+@module Saw(frequency, retrigger=0):
   members:
     float position = 0, last_trigger = 0
   fill:
@@ -15,7 +15,7 @@
     frequency: 0, 22050
 @
 
-@module Pulse(frequency, pulsewidth, retrigger):
+@module Pulse(frequency, pulsewidth=0.5, retrigger=0):
   members:
     float position = 0, last_trigger = 0
   fill:
@@ -32,11 +32,11 @@
     frequency: 0, 22050
 @
 
-@module Sine(frequency, retrigger):
+@module Sine(frequency, retrigger=0, phase_offset=0):
   members:
     float position = 0, last_trigger = 0
   fill:
-    *output++ = sin(m_position*2*pi);
+    *output++ = sin((m_position+phase_offset[i])*2*pi);
     m_position += frequency[i] / sample_rate;
     m_position -= int(m_position);
     if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
@@ -49,7 +49,7 @@
     frequency: 0, 22050
 @
 
-@module Triangle(frequency, retrigger):
+@module Triangle(frequency, retrigger=0):
   members:
     float position = 0, last_trigger = 0
   fill:
@@ -75,7 +75,15 @@
     *out_max =  1;
 @
 
-@module Sample(string sample_name, frequency, retrigger, loop_start, loop_end):
+@module Within(input, float min, float max):
+  fill:
+    *output++ = (input[i]>=m_min && input[i]<=m_max) ? 1 : 0;
+  output_range:
+    *out_min = 0;
+    *out_max = 1;
+@
+
+@module Sample(string sample_name, frequency, retrigger=0, loop_start=0, loop_end=1):
   members:
     float   position         = 0
     WaveIn* sample           = 0
@@ -96,7 +104,10 @@
     m_last_trigger = retrigger[i];
 
     if(m_position > loop_end[i])
+    {
       m_position -= (loop_end[i] - loop_start[i]);
+      if(m_position > loop_end[i]) m_position = loop_end[i]; 
+    }
   output_range:
     *out_min = -1;
     *out_max =  1;
@@ -214,23 +225,18 @@
     int   stage    = 0
   misc:
     enum { IDLE = 0, ATTACK, DECAY, SUSTAIN, RELEASE };
-    float coefficient(float time)
-    {
-      return (360481000.0*pow(time, 1.1f) + 1) /
-             (360481000.0*pow(time, 1.1f) + 100000);
-    }
   output_range:
     *out_min = 0;
     *out_max = 1;
   input_range:
-    gate: 0, 1
+    gate: -1, 1
   fill:
     if(!m_held)
     { 
       if(gate[i] > 0.9)
       {
         m_stage       = ATTACK;        
-        m_coefficient = coefficient(m_att);
+        m_coefficient = onepoleCoefficient(m_att);
         m_destination = 1;
         m_held        = true;
       }
@@ -240,7 +246,7 @@
       if(gate[i] < 0.1)
       {
         m_stage       = RELEASE;
-        m_coefficient = coefficient(m_rel);
+        m_coefficient = onepoleCoefficient(m_rel);
         m_destination = 0;
         m_held        = false;
       }
@@ -254,7 +260,7 @@
         if(m_position >= 0.999)          
         {
           m_stage       = DECAY;
-          m_coefficient = coefficient(m_dec);
+          m_coefficient = onepoleCoefficient(m_dec);
           m_destination = m_sus;
         }
         break;
@@ -280,7 +286,7 @@
   output_range:
     m_source->getOutputRange(out_min, out_max);
   input_range:
-    trigger: 0, 1
+    trigger: -1, 1
   fill:
     if(m_last_trigger < 0.1 && trigger[i] > 0.9)
       m_value = source[i];
@@ -322,6 +328,30 @@
 @module BitCrusher(input, range):
   fill:
     *output++ = int(input[i] * range[i]) / range[i];
+  output_range:
+    m_input->getOutputRange(out_min, out_max);
+@
+
+// basically the same thing as slew limiter, but don't tell anybody!
+@module AttackRelease(input, attack, release):
+  members:
+    float last = 0
+    float current_attack = -1, current_release = -1
+    float up = 0, down = 0
+    
+  initialize:
+    float dummy;
+    m_input->getOutputRange(&m_last, &dummy);
+  fill:
+    if(attack [i] != m_current_attack )
+      m_current_attack   = attack [i], m_up   = onepoleCoefficient(attack [i]);
+    if(release[i] != m_current_release)
+      m_current_release  = release[i], m_down = onepoleCoefficient(release[i]);
+    if(input[i] > m_last)
+      m_last = m_last*m_up   + input[i]*(1-m_up  );
+    else
+      m_last = m_last*m_down + input[i]*(1-m_down);
+    *output++ = m_last;
   output_range:
     m_input->getOutputRange(out_min, out_max);
 @
@@ -368,11 +398,23 @@
       return pow(2.0, m_closest_notes[int(note)]/12.0) * note_0;
     }
   output_range:
-    *out_min = freqFromNote(1), *out_max = freqFromNote(127);
+    float min, max;
+    m_input->getOutputRange(&min, &max);
+    *out_min = freqFromNote(min), *out_max = freqFromNote(max);
   input_range:
     input: 0, 127
   fill:
     *output++ = freqFromNote(input[i]);
+@
+
+@module MixDown(StereoModule input):
+  fill:
+    *output++ = *input++ + *input++;
+  output_range:
+    float min, max;
+    m_input->getOutputRange(&min, &max);
+    *out_min = min*2;
+    *out_max = max*2;
 @
 
 @stereomodule Pan(input, position):

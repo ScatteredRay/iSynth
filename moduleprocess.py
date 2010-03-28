@@ -86,7 +86,10 @@ class %s : public %sModule
       name = tp[0]
       type = "Module"
       if len(tp) > 1: type, name = tp
-      if name!="": _.parameters.append((name, type))
+      default = None
+      name_default = name.split("=")
+      if len(name_default) > 1: name, default = name_default
+      if name!="": _.parameters.append((name, type, default))
   
   def parseMemberLine(_, line):    
     line = line.strip()
@@ -141,8 +144,8 @@ def writeModuleMetadata(modules):
     print "  g_module_infos[\"%s\"] = new ModuleInfo(\"%s\", %s::create);" \
           % (m.name, m.name, m.name)
     for p in m.parameters:
-      print "  g_module_infos[\"%s\"]->addParameter(\"%s\", \"%s\");" % \
-            (m.name, p[0], p[1])
+      print "  g_module_infos[\"%s\"]->addParameter(\"%s\", \"%s\"%s);" % \
+            (m.name, p[0], p[1], ", %s"%p[2] if p[2] else "")
   print "}"
 
 def main():

@@ -96,8 +96,8 @@ void readInput()
                         FROM_LEFT_1ST_BUTTON_PRESSED) ? 1.0f:0.0f;
         if(input_button == 1.0)
         {
-          input_x = -1 + events[i].Event.MouseEvent.dwMousePosition.X / 40.0f;
-          input_y =  1 - events[i].Event.MouseEvent.dwMousePosition.Y / 25.0f;        
+          input_x = -1 + events[i].Event.MouseEvent.dwMousePosition.X / 39.0f;
+          input_y =  1 - events[i].Event.MouseEvent.dwMousePosition.Y / 24.0f;        
         }
       }
       else if(events[i].EventType==KEY_EVENT &&

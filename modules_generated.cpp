@@ -118,6 +118,7 @@ class Sine : public Module
     {
       m_frequency = parameters[0]->m_module;
       m_retrigger = parameters[1]->m_module;
+      m_phase_offset = parameters[2]->m_module;
       m_position = 0;
       m_last_trigger = 0;
 
@@ -135,10 +136,11 @@ class Sine : public Module
       float *output = m_output;
       const float *frequency = m_frequency->output(last_fill, samples);
       const float *retrigger = m_retrigger->output(last_fill, samples);
+      const float *phase_offset = m_phase_offset->output(last_fill, samples);
 
       for(int i=0; i<samples; i++)
       {
-        *output++ = sin(m_position*2*pi);
+        *output++ = sin((m_position+phase_offset[i])*2*pi);
         m_position += frequency[i] / sample_rate;
         m_position -= int(m_position);
         if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
@@ -160,6 +162,7 @@ class Sine : public Module
   private:
     Module *m_frequency;
     Module *m_retrigger;
+    Module *m_phase_offset;
     float m_position;
     float m_last_trigger;
 };
@@ -258,6 +261,51 @@ class Noise : public Module
 };
 
 
+class Within : public Module
+{
+  public:
+    Within(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_module;
+      m_min = parameters[1]->m_float;
+      m_max = parameters[2]->m_float;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new Within(parameters);
+    }
+
+    const char *moduleName() { return "Within"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = (input[i]>=m_min && input[i]<=m_max) ? 1 : 0;
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      *out_min = 0;
+      *out_max = 1;
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
+    Module *m_input;
+    float m_min;
+    float m_max;
+};
+
+
 class Sample : public Module
 {
   public:
@@ -302,7 +350,10 @@ class Sample : public Module
           m_position = 0;
         m_last_trigger = retrigger[i];
         if(m_position > loop_end[i])
+        {
           m_position -= (loop_end[i] - loop_start[i]);
+          if(m_position > loop_end[i]) m_position = loop_end[i];
+        }
       }
     }
 
@@ -654,11 +705,6 @@ class EnvelopeGenerator : public Module
 
     const char *moduleName() { return "EnvelopeGenerator"; }
     enum { IDLE = 0, ATTACK, DECAY, SUSTAIN, RELEASE };
-    float coefficient(float time)
-    {
-      return (360481000.0*pow(time, 1.1f) + 1) /
-             (360481000.0*pow(time, 1.1f) + 100000);
-    }
 
     
     void fill(float last_fill, int samples)
@@ -673,7 +719,7 @@ class EnvelopeGenerator : public Module
           if(gate[i] > 0.9)
           {
             m_stage       = ATTACK;
-            m_coefficient = coefficient(m_att);
+            m_coefficient = onepoleCoefficient(m_att);
             m_destination = 1;
             m_held        = true;
           }
@@ -683,7 +729,7 @@ class EnvelopeGenerator : public Module
           if(gate[i] < 0.1)
           {
             m_stage       = RELEASE;
-            m_coefficient = coefficient(m_rel);
+            m_coefficient = onepoleCoefficient(m_rel);
             m_destination = 0;
             m_held        = false;
           }
@@ -695,7 +741,7 @@ class EnvelopeGenerator : public Module
             if(m_position >= 0.999)
             {
               m_stage       = DECAY;
-              m_coefficient = coefficient(m_dec);
+              m_coefficient = onepoleCoefficient(m_dec);
               m_destination = m_sus;
             }
             break;
@@ -721,7 +767,7 @@ class EnvelopeGenerator : public Module
 
     void validateInputRange()
     {
-      validateWithin(*m_gate, 0, 1);
+      validateWithin(*m_gate, -1, 1);
     }
   private:
     Module *m_gate;
@@ -779,7 +825,7 @@ class SampleAndHold : public Module
 
     void validateInputRange()
     {
-      validateWithin(*m_trigger, 0, 1);
+      validateWithin(*m_trigger, -1, 1);
     }
   private:
     Module *m_source;
@@ -970,6 +1016,73 @@ class BitCrusher : public Module
     Module *m_range;
 };
 
+// basically the same thing as slew limiter, but don't tell anybody!
+
+class AttackRelease : public Module
+{
+  public:
+    AttackRelease(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_module;
+      m_attack = parameters[1]->m_module;
+      m_release = parameters[2]->m_module;
+      m_last = 0;
+      m_current_attack = -1;
+      m_current_release = -1;
+      m_up = 0;
+      m_down = 0;
+      float dummy;
+      m_input->getOutputRange(&m_last, &dummy);
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new AttackRelease(parameters);
+    }
+
+    const char *moduleName() { return "AttackRelease"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+      const float *attack = m_attack->output(last_fill, samples);
+      const float *release = m_release->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        if(attack [i] != m_current_attack )
+          m_current_attack   = attack [i], m_up   = onepoleCoefficient(attack [i]);
+        if(release[i] != m_current_release)
+          m_current_release  = release[i], m_down = onepoleCoefficient(release[i]);
+        if(input[i] > m_last)
+          m_last = m_last*m_up   + input[i]*(1-m_up  );
+        else
+          m_last = m_last*m_down + input[i]*(1-m_down);
+        *output++ = m_last;
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      m_input->getOutputRange(out_min, out_max);
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
+    Module *m_input;
+    Module *m_attack;
+    Module *m_release;
+    float m_last;
+    float m_current_attack;
+    float m_current_release;
+    float m_up;
+    float m_down;
+};
+
 
 class SlewLimiter : public Module
 {
@@ -1074,7 +1187,9 @@ class NoteToFrequency : public Module
 
     void getOutputRange(float *out_min, float *out_max)
     {
-      *out_min = freqFromNote(1), *out_max = freqFromNote(127);
+      float min, max;
+      m_input->getOutputRange(&min, &max);
+      *out_min = freqFromNote(min), *out_max = freqFromNote(max);
     }
 
     void validateInputRange()
@@ -1086,6 +1201,49 @@ class NoteToFrequency : public Module
     string m_scale_name;
     char* m_scale;
     char* m_closest_notes;
+};
+
+
+class MixDown : public Module
+{
+  public:
+    MixDown(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_stereomodule;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new MixDown(parameters);
+    }
+
+    const char *moduleName() { return "MixDown"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        *output++ = *input++ + *input++;
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      float min, max;
+      m_input->getOutputRange(&min, &max);
+      *out_min = min*2;
+      *out_max = max*2;
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
+    StereoModule *m_input;
 };
 
 
@@ -1439,24 +1597,29 @@ void fillModuleList()
 {
   g_module_infos["Saw"] = new ModuleInfo("Saw", Saw::create);
   g_module_infos["Saw"]->addParameter("frequency", "Module");
-  g_module_infos["Saw"]->addParameter("retrigger", "Module");
+  g_module_infos["Saw"]->addParameter("retrigger", "Module", 0);
   g_module_infos["Pulse"] = new ModuleInfo("Pulse", Pulse::create);
   g_module_infos["Pulse"]->addParameter("frequency", "Module");
-  g_module_infos["Pulse"]->addParameter("pulsewidth", "Module");
-  g_module_infos["Pulse"]->addParameter("retrigger", "Module");
+  g_module_infos["Pulse"]->addParameter("pulsewidth", "Module", 0.5);
+  g_module_infos["Pulse"]->addParameter("retrigger", "Module", 0);
   g_module_infos["Sine"] = new ModuleInfo("Sine", Sine::create);
   g_module_infos["Sine"]->addParameter("frequency", "Module");
-  g_module_infos["Sine"]->addParameter("retrigger", "Module");
+  g_module_infos["Sine"]->addParameter("retrigger", "Module", 0);
+  g_module_infos["Sine"]->addParameter("phase_offset", "Module", 0);
   g_module_infos["Triangle"] = new ModuleInfo("Triangle", Triangle::create);
   g_module_infos["Triangle"]->addParameter("frequency", "Module");
-  g_module_infos["Triangle"]->addParameter("retrigger", "Module");
+  g_module_infos["Triangle"]->addParameter("retrigger", "Module", 0);
   g_module_infos["Noise"] = new ModuleInfo("Noise", Noise::create);
+  g_module_infos["Within"] = new ModuleInfo("Within", Within::create);
+  g_module_infos["Within"]->addParameter("input", "Module");
+  g_module_infos["Within"]->addParameter("min", "float");
+  g_module_infos["Within"]->addParameter("max", "float");
   g_module_infos["Sample"] = new ModuleInfo("Sample", Sample::create);
   g_module_infos["Sample"]->addParameter("sample_name", "string");
   g_module_infos["Sample"]->addParameter("frequency", "Module");
-  g_module_infos["Sample"]->addParameter("retrigger", "Module");
-  g_module_infos["Sample"]->addParameter("loop_start", "Module");
-  g_module_infos["Sample"]->addParameter("loop_end", "Module");
+  g_module_infos["Sample"]->addParameter("retrigger", "Module", 0);
+  g_module_infos["Sample"]->addParameter("loop_start", "Module", 0);
+  g_module_infos["Sample"]->addParameter("loop_end", "Module", 1);
   g_module_infos["Rescaler"] = new ModuleInfo("Rescaler", Rescaler::create);
   g_module_infos["Rescaler"]->addParameter("input", "Module");
   g_module_infos["Rescaler"]->addParameter("to_min", "float");
@@ -1494,6 +1657,10 @@ void fillModuleList()
   g_module_infos["BitCrusher"] = new ModuleInfo("BitCrusher", BitCrusher::create);
   g_module_infos["BitCrusher"]->addParameter("input", "Module");
   g_module_infos["BitCrusher"]->addParameter("range", "Module");
+  g_module_infos["AttackRelease"] = new ModuleInfo("AttackRelease", AttackRelease::create);
+  g_module_infos["AttackRelease"]->addParameter("input", "Module");
+  g_module_infos["AttackRelease"]->addParameter("attack", "Module");
+  g_module_infos["AttackRelease"]->addParameter("release", "Module");
   g_module_infos["SlewLimiter"] = new ModuleInfo("SlewLimiter", SlewLimiter::create);
   g_module_infos["SlewLimiter"]->addParameter("input", "Module");
   g_module_infos["SlewLimiter"]->addParameter("up", "float");
@@ -1501,6 +1668,8 @@ void fillModuleList()
   g_module_infos["NoteToFrequency"] = new ModuleInfo("NoteToFrequency", NoteToFrequency::create);
   g_module_infos["NoteToFrequency"]->addParameter("input", "Module");
   g_module_infos["NoteToFrequency"]->addParameter("scale_name", "string");
+  g_module_infos["MixDown"] = new ModuleInfo("MixDown", MixDown::create);
+  g_module_infos["MixDown"]->addParameter("input", "StereoModule");
   g_module_infos["Pan"] = new ModuleInfo("Pan", Pan::create);
   g_module_infos["Pan"]->addParameter("input", "Module");
   g_module_infos["Pan"]->addParameter("position", "Module");
