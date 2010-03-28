@@ -33,15 +33,19 @@ Multiply cutoff(cutoff_y, cutoff_env)
 Add cutoff_offset(cutoff, freq)
 Filter filter(osc, cutoff_offset, 0.7)
 
+#decimator
 Rescaler trigger_freq_coef(y, 8, 41)
 Multiply trigger_freq(freq, trigger_freq_coef)
 Pulse trigger(trigger_freq, 0.5, 0)
+
 SampleAndHold crushed(filter, trigger)
-#Rescaler bits(y, 4, 64)
-#BitCrusher crushed(filter, bits)
+#Rescaler crushamt(y, 4, 64)
+#BitCrusher crushed(filter, crushamt)
+
+SlewLimiter smoothcrushed(crushed, 0.3, 0.3)
 
 #amp
-Multiply notes(crushed, env)
+Multiply amped(smoothcrushed, env)
 
 #panning
-PingPongDelay output(0.15, 0.05, notes, 0.4, 1.0, 0.9)
+PingPongDelay output(0.15, 0.2, amped, 0.6, 1.0, 0.8)

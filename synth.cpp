@@ -473,6 +473,13 @@ class ModuleInfo
     Module *(*m_instantiator)(vector<ModuleParam *> parameters);
 };
 
+// hardcoded to 44100khz.  rescale to other sample rates by multiplying time?
+float onepoleCoefficient(float time)
+{
+  return (360481000.0*pow(time, 1.1f) + 1) /
+         (360481000.0*pow(time, 1.1f) + 100000);
+}
+
 map<string, ModuleInfo *> g_module_infos;
 
 EXCEPTION_D(ModuleExcept, Exception, "Module exception")

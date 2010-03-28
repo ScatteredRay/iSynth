@@ -657,11 +657,6 @@ class EnvelopeGenerator : public Module
 
     const char *moduleName() { return "EnvelopeGenerator"; }
     enum { IDLE = 0, ATTACK, DECAY, SUSTAIN, RELEASE };
-    float coefficient(float time)
-    {
-      return (360481000.0*pow(time, 1.1f) + 1) /
-             (360481000.0*pow(time, 1.1f) + 100000);
-    }
 
     
     void fill(float last_fill, int samples)
@@ -676,7 +671,7 @@ class EnvelopeGenerator : public Module
           if(gate[i] > 0.9)
           {
             m_stage       = ATTACK;
-            m_coefficient = coefficient(m_att);
+            m_coefficient = onepoleCoefficient(m_att);
             m_destination = 1;
             m_held        = true;
           }
@@ -686,7 +681,7 @@ class EnvelopeGenerator : public Module
           if(gate[i] < 0.1)
           {
             m_stage       = RELEASE;
-            m_coefficient = coefficient(m_rel);
+            m_coefficient = onepoleCoefficient(m_rel);
             m_destination = 0;
             m_held        = false;
           }
@@ -698,7 +693,7 @@ class EnvelopeGenerator : public Module
             if(m_position >= 0.999)
             {
               m_stage       = DECAY;
-              m_coefficient = coefficient(m_dec);
+              m_coefficient = onepoleCoefficient(m_dec);
               m_destination = m_sus;
             }
             break;
@@ -724,7 +719,7 @@ class EnvelopeGenerator : public Module
 
     void validateInputRange()
     {
-      validateWithin(*m_gate, 0, 1);
+      validateWithin(*m_gate, -1, 1);
     }
   private:
     Module *m_gate;
@@ -971,6 +966,73 @@ class BitCrusher : public Module
   private:
     Module *m_input;
     Module *m_range;
+};
+
+// basically the same thing as slew limiter, but don't tell anybody!
+
+class AttackRelease : public Module
+{
+  public:
+    AttackRelease(vector<ModuleParam *> parameters)
+    {
+      m_input = parameters[0]->m_module;
+      m_attack = parameters[1]->m_module;
+      m_release = parameters[2]->m_module;
+      m_last = 0;
+      m_current_attack = -1;
+      m_current_release = -1;
+      m_up = 0;
+      m_down = 0;
+      float dummy;
+      m_input->getOutputRange(&m_last, &dummy);
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new AttackRelease(parameters);
+    }
+
+    const char *moduleName() { return "AttackRelease"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *input = m_input->output(last_fill, samples);
+      const float *attack = m_attack->output(last_fill, samples);
+      const float *release = m_release->output(last_fill, samples);
+
+      for(int i=0; i<samples; i++)
+      {
+        if(attack [i] != m_current_attack )
+          m_current_attack   = attack [i], m_up   = onepoleCoefficient(attack [i]);
+        if(release[i] != m_current_release)
+          m_current_release  = release[i], m_down = onepoleCoefficient(release[i]);
+        if(input[i] > m_last)
+          m_last = m_last*m_up   + input[i]*(1-m_up  );
+        else
+          m_last = m_last*m_down + input[i]*(1-m_down);
+        *output++ = m_last;
+      }
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      m_input->getOutputRange(out_min, out_max);
+    }
+
+    void validateInputRange()
+    {
+    }
+  private:
+    Module *m_input;
+    Module *m_attack;
+    Module *m_release;
+    float m_last;
+    float m_current_attack;
+    float m_current_release;
+    float m_up;
+    float m_down;
 };
 
 
@@ -1500,6 +1562,10 @@ void fillModuleList()
   g_module_infos["BitCrusher"] = new ModuleInfo("BitCrusher", BitCrusher::create);
   g_module_infos["BitCrusher"]->addParameter("input", "Module");
   g_module_infos["BitCrusher"]->addParameter("range", "Module");
+  g_module_infos["AttackRelease"] = new ModuleInfo("AttackRelease", AttackRelease::create);
+  g_module_infos["AttackRelease"]->addParameter("input", "Module");
+  g_module_infos["AttackRelease"]->addParameter("attack", "Module");
+  g_module_infos["AttackRelease"]->addParameter("release", "Module");
   g_module_infos["SlewLimiter"] = new ModuleInfo("SlewLimiter", SlewLimiter::create);
   g_module_infos["SlewLimiter"]->addParameter("input", "Module");
   g_module_infos["SlewLimiter"]->addParameter("up", "float");
