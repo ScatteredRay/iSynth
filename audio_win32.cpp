@@ -88,7 +88,10 @@ void streamSound(unsigned int buffer_size)
   
   for(;;)
   {
-    if(getKey() == 27) return;
+    char key = getKey();
+    if(key == K_ESCAPE) return;
+    if(key == K_RIGHT ) synthNextPatch(-1);
+    if(key == K_LEFT  ) synthNextPatch();
     
     DWORD event = MsgWaitForMultipleObjects(1, &notification_event, false,
                                             INFINITE,  QS_ALLEVENTS);
@@ -128,8 +131,8 @@ void streamSound(unsigned int buffer_size)
 
         for(int i=0; i<2; i++)
           if(write_buffers[i])
-            produceStream((short *)(write_buffers[i]),
-                                    write_buffer_sizes[i]/4);
+            synthProduceStream((short *)(write_buffers[i]),
+                                         write_buffer_sizes[i]/4);
    
         if(FAILED(buffer->Unlock(write_buffers[0], write_buffer_sizes[0], 
                                  write_buffers[1], write_buffer_sizes[1])))

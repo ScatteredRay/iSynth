@@ -1,6 +1,7 @@
 #ifndef _SYNTH_H
 #define _SYNTH_H
 
-void produceStream(short *buffer, int samples);
+void synthProduceStream(short *buffer, int samples);
+void synthNextPatch(int offset = 1);
 
 #endif

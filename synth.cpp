@@ -602,17 +602,16 @@ EXCEPTION  (NoOutputModuleExcept,  Exception, "No output module")
 EXCEPTION  (OutputNotStereoExcept, Exception, "Output not stereo")
 EXCEPTION_D(CouldntOpenFileExcept, Exception, "Couldn't open file")
 
-Module *setupStream()
+static vector<string> g_patches;
+static int g_patch_position = 0;
+static vector<string> g_log_list;
+static Module *g_stream_output;
+
+Module *loadPatch(const string &filename)
 {
-  fillModuleList();
-  g_module_infos["Input"] = new ModuleInfo("Input", Input::create);
-  g_module_infos["Input"]->addParameter("axis", "int");
+  g_modules.clear();
 
-  char *patch_filename = "patches/pad.pat";
-  for(int i=1; i<argCount(); i++)
-    if(!strchr(getArg(i), ':')) patch_filename = getArg(i);
-
-  File in(patch_filename, File::READ);
+  File in(filename, File::READ);
 
   string s;
   while(!in.eof())
@@ -625,38 +624,64 @@ Module *setupStream()
   
   in.close();
 
+  for(vector<string>::iterator name = g_log_list.begin();
+      name!=g_log_list.end(); name++)
+  {
+    if(!g_modules.count(*name)) throw(UnknownModuleExcept(*name));
+    g_modules[*name]->createLog(*name);
+  }
+  
+  if(!g_modules.count("output")) throw(NoOutputModuleExcept());
+  Module *output = g_modules["output"];
+  if(!output->stereo()) throw(OutputNotStereoExcept());
+  
+  return output;
+}
+
+void synthNextPatch(int offset)
+{
+  if(g_patches.size() == 0) return;
+  
+  g_patch_position += offset;
+  if(g_patch_position < 0) g_patch_position = g_patches.size()-1;
+  if(g_patch_position >= g_patches.size()) g_patch_position = 0;
+  g_stream_output = loadPatch(g_patches[g_patch_position]);
+}
+
+Module *setupStream()
+{
+  fillModuleList();
+  g_module_infos["Input"] = new ModuleInfo("Input", Input::create);
+  g_module_infos["Input"]->addParameter("axis", "int");
+
+  //char *patch_filename = "patches/pad.pat";
+  for(int i=1; i<argCount(); i++)
+    if(!strchr(getArg(i), ':')) g_patches.push_back(getArg(i));
+  if(g_patches.size() == 0) g_patches.push_back("patches/pad.pat");
+
   for(int i=1; i<argCount(); i++)
     if(memcmp(getArg(i), "log:", 4) == 0)
     {      
       char loglist[256];
       strncpy(loglist, getArg(i)+4, 255);
       char *name = strtok(loglist, ",");
-      do
-      {
-        if(!g_modules.count(name)) throw(UnknownModuleExcept(name));
-        g_modules[name]->createLog(name);
-      }        
-      while(name = strtok(0, ","));
+      do g_log_list.push_back(name); while(name = strtok(0, ","));
     }
 
-  if(!g_modules.count("output")) throw(NoOutputModuleExcept());
-  Module *output = g_modules["output"];
-  if(!output->stereo()) throw(OutputNotStereoExcept());
-  return output;
+  return loadPatch(g_patches[0]);
 }
 
-void produceStream(short *buffer, int samples)
+void synthProduceStream(short *buffer, int samples)
 { 
   static bool first = true;
-  static Module *output;
   if(first)
   {
     first = false;
-    output = setupStream();
+    g_stream_output = setupStream();
   }
   
   static float time = 0;
-  const float *o = output->output(time, samples);
+  const float *o = g_stream_output->output(time, samples);
   time += 1.0;
   
   for(int i=0; i<samples*2; i+=2)

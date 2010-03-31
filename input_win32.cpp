@@ -104,9 +104,11 @@ void readInput()
               events[i].Event.KeyEvent.bKeyDown)
       {
         int key = events[i].Event.KeyEvent.uChar.AsciiChar;
+        if(events[i].Event.KeyEvent.wVirtualKeyCode == 37) key = K_LEFT;
+        if(events[i].Event.KeyEvent.wVirtualKeyCode == 39) key = K_RIGHT;
         if(key && (key_write_pos+1) % key_buffer_size != key_read_pos)
         {
-          key_buffer[key_write_pos++] = key;          
+          key_buffer[key_write_pos++] = key;
           key_write_pos %= key_buffer_size;
         }
       }

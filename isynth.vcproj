@@ -335,6 +335,18 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\patches\lewp.pat"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCustomBuildTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
 				RelativePath=".\moduleprocess.py"
 				>
 				<FileConfiguration
