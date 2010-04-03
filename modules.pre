@@ -83,25 +83,29 @@
     *out_max = 1;
 @
 
-@module Sample(string sample_name, frequency, retrigger=0, loop_start=0, loop_end=1):
+@module Sample(string sample_name, frequency, trigger=0, loop_start=0, loop_end=1):
   members:
     float   position         = 0
     WaveIn* sample           = 0
     float   rate_coefficient = 0
-    float   last_trigger     = 0
+    float   last_trigger     = -1
   initialize:
     m_sample = new WaveIn(m_sample_name);
-    m_rate_coefficient = m_sample->nativeSampleRate() / middle_c /
-                         m_sample->length() / sample_rate;
+    m_rate_coefficient = 0;
   misc:
     ~Sample() { delete m_sample; }
   fill:
     *output++ = m_sample->valueAt(m_position);
-    m_position += frequency[i] * m_rate_coefficient;
     
-    if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+    if(m_last_trigger < 0.1 && trigger[i] > 0.9)
+    {
       m_position = 0;
-    m_last_trigger = retrigger[i];
+      m_rate_coefficient = m_sample->nativeSampleRate() / middle_c /
+                           m_sample->length() / sample_rate;
+    }
+    m_last_trigger = trigger[i];
+
+    m_position += frequency[i] * m_rate_coefficient;
 
     if(m_position > loop_end[i])
     {
@@ -113,7 +117,7 @@
     *out_max =  1;
   input_range:
     frequency: 0, 22050
-    retrigger: 0, 1
+    trigger: 0, 1
     loop_start: 0, 1
     loop_end: 0, 1
 @

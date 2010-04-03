@@ -313,16 +313,15 @@ class Sample : public Module
     {
       m_sample_name = parameters[0]->m_string;
       m_frequency = parameters[1]->m_module;
-      m_retrigger = parameters[2]->m_module;
+      m_trigger = parameters[2]->m_module;
       m_loop_start = parameters[3]->m_module;
       m_loop_end = parameters[4]->m_module;
       m_position = 0;
       m_sample = 0;
       m_rate_coefficient = 0;
-      m_last_trigger = 0;
+      m_last_trigger = -1;
       m_sample = new WaveIn(m_sample_name);
-      m_rate_coefficient = m_sample->nativeSampleRate() / middle_c /
-                           m_sample->length() / sample_rate;
+      m_rate_coefficient = 0;
 
     }
     static Module *create(vector<ModuleParam *> parameters)
@@ -338,17 +337,21 @@ class Sample : public Module
     {
       float *output = m_output;
       const float *frequency = m_frequency->output(last_fill, samples);
-      const float *retrigger = m_retrigger->output(last_fill, samples);
+      const float *trigger = m_trigger->output(last_fill, samples);
       const float *loop_start = m_loop_start->output(last_fill, samples);
       const float *loop_end = m_loop_end->output(last_fill, samples);
 
       for(int i=0; i<samples; i++)
       {
         *output++ = m_sample->valueAt(m_position);
-        m_position += frequency[i] * m_rate_coefficient;
-        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+        if(m_last_trigger < 0.1 && trigger[i] > 0.9)
+        {
           m_position = 0;
-        m_last_trigger = retrigger[i];
+          m_rate_coefficient = m_sample->nativeSampleRate() / middle_c /
+                               m_sample->length() / sample_rate;
+        }
+        m_last_trigger = trigger[i];
+        m_position += frequency[i] * m_rate_coefficient;
         if(m_position > loop_end[i])
         {
           m_position -= (loop_end[i] - loop_start[i]);
@@ -366,14 +369,14 @@ class Sample : public Module
     void validateInputRange()
     {
       validateWithin(*m_frequency, 0, 22050);
-      validateWithin(*m_retrigger, 0, 1);
+      validateWithin(*m_trigger, 0, 1);
       validateWithin(*m_loop_start, 0, 1);
       validateWithin(*m_loop_end, 0, 1);
     }
   private:
     string m_sample_name;
     Module *m_frequency;
-    Module *m_retrigger;
+    Module *m_trigger;
     Module *m_loop_start;
     Module *m_loop_end;
     float m_position;
@@ -1617,7 +1620,7 @@ void fillModuleList()
   g_module_infos["Sample"] = new ModuleInfo("Sample", Sample::create);
   g_module_infos["Sample"]->addParameter("sample_name", "string");
   g_module_infos["Sample"]->addParameter("frequency", "Module");
-  g_module_infos["Sample"]->addParameter("retrigger", "Module", 0);
+  g_module_infos["Sample"]->addParameter("trigger", "Module", 0);
   g_module_infos["Sample"]->addParameter("loop_start", "Module", 0);
   g_module_infos["Sample"]->addParameter("loop_end", "Module", 1);
   g_module_infos["Rescaler"] = new ModuleInfo("Rescaler", Rescaler::create);

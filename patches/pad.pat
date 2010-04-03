@@ -2,8 +2,6 @@
 Input x(0)
 Input y(1)
 Input touch(2)
-SampleAndHold initial_x(x, touch)
-SampleAndHold initial_y(y, touch)
 
 #note
 Rescaler note(x, 46, 70)
@@ -11,11 +9,13 @@ Quantize note_quant(note)
 NoteToFrequency note_freq(note_quant, "mixolydian")
 
 #vibrato
-EnvelopeGenerator vibrato_env(touch, 2, 1, 1, 1)
 Sine vibrato_lfo(5)
+EnvelopeGenerator vibrato_env(touch, 2, 1, 1, 1)
 Multiply vibrato_enveloped(vibrato_lfo, vibrato_env)
+
 Rescaler vibrato_y(y, 0, 1)
 Multiply vibrato_unit(vibrato_enveloped, vibrato_y)
+
 Rescaler vibrato(vibrato_unit, 0.975, 1.025)
 Multiply freq(note_freq, vibrato)
 
@@ -37,7 +37,7 @@ EnvelopeGenerator vol(touch, 0.6, 1.0, 0.3, 0.03)
 Multiply notes(filter, vol)
 
 #panning
-Rescaler panpos(initial_x, 0.15, 0.85)
+Rescaler panpos(x, 0.15, 0.85)
 Pan panned_notes(notes, panpos)
 PingPongDelay delay(0.5, 0.5, notes, 0.5, 0, 0.3)
 StereoAdd output(delay, panned_notes)
