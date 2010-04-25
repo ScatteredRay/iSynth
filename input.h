@@ -1,11 +1,14 @@
 #ifndef _INPUT_H
 #define _INPUT_H
 
+#include <vector>
+#include <string>
+
 void initInput(int argc, char **argv);
 void deinitInput();
 
-int argCount();
-char *getArg(int n);
+void populatePatchList(std::vector<std::string>& patches);
+void setupLogging(std::vector<std::string>& log_list);
 
 void readInputAxis(int axis, float *buffer, int size);
 char getKey();

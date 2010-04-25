@@ -137,7 +137,7 @@ static unsigned char wave_header[] =
 class WaveIn
 {
   public:
-    WaveIn(const string filename)
+    WaveIn(const FileRef filename)
     {
       File in(filename, File::READ);
       static unsigned char header[sizeof(wave_header)];
@@ -602,12 +602,12 @@ EXCEPTION  (NoOutputModuleExcept,  Exception, "No output module")
 EXCEPTION  (OutputNotStereoExcept, Exception, "Output not stereo")
 EXCEPTION_D(CouldntOpenFileExcept, Exception, "Couldn't open file")
 
-static vector<string> g_patches;
+static vector<FileRef> g_patches;
 static int g_patch_position = 0;
-static vector<string> g_log_list;
+static vector<FileRef> g_log_list;
 static Module *g_stream_output;
 
-Module *loadPatch(const string &filename)
+Module *loadPatch(const FileRef &filename)
 {
   g_modules.clear();
 
@@ -654,19 +654,9 @@ Module *setupStream()
   g_module_infos["Input"] = new ModuleInfo("Input", Input::create);
   g_module_infos["Input"]->addParameter("axis", "int");
 
-  //char *patch_filename = "patches/pad.pat";
-  for(int i=1; i<argCount(); i++)
-    if(!strchr(getArg(i), ':')) g_patches.push_back(getArg(i));
-  if(g_patches.size() == 0) g_patches.push_back("patches/pad.pat");
+  populatePatchList(g_patches);
 
-  for(int i=1; i<argCount(); i++)
-    if(memcmp(getArg(i), "log:", 4) == 0)
-    {      
-      char loglist[256];
-      strncpy(loglist, getArg(i)+4, 255);
-      char *name = strtok(loglist, ",");
-      do g_log_list.push_back(name); while(name = strtok(0, ","));
-    }
+  setupLogging(g_log_list);
 
   return loadPatch(g_patches[0]);
 }

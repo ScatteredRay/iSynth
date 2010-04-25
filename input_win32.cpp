@@ -45,6 +45,26 @@ char *getArg(int n)
   return 0;
 }
 
+void populatePatchList(vector<string>& patches)
+{
+    //char *patch_filename = "patches/pad.pat";
+    for(int i=1; i<argCount(); i++)
+        if(!strchr(getArg(i), ':')) patches.push_back(getArg(i));
+    if(patches.size() == 0) patches.push_back("patches/pad.pat");
+}
+
+void setupLogging(vector<string>& log_list)
+{
+  for(int i=1; i<argCount(); i++)
+    if(memcmp(getArg(i), "log:", 4) == 0)
+    {      
+      char loglist[256];
+      strncpy(loglist, getArg(i)+4, 255);
+      char *name = strtok(loglist, ",");
+      do log_list.push_back(name); while(name = strtok(0, ","));
+    }
+}
+
 void deinitInput()
 {
   COORD origin = { 0, 0 };

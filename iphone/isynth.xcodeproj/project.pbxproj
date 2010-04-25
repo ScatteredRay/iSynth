@@ -16,10 +16,11 @@
 		28AD733F0D9D9553002E5188 /* MainWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = 28AD733E0D9D9553002E5188 /* MainWindow.xib */; };
 		28D7ACF80DDB3853001CB0EB /* isynthViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 28D7ACF70DDB3853001CB0EB /* isynthViewController.mm */; };
 		A9502D70111664C7007CFD97 /* audio_osx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A9502D6E111664C7007CFD97 /* audio_osx.cpp */; };
-		A9502D71111664C7007CFD97 /* audio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A9502D6F111664C7007CFD97 /* audio.cpp */; };
 		A9502D7C111665E1007CFD97 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9502D7B111665E1007CFD97 /* CoreFoundation.framework */; };
 		A9502DDD11168261007CFD97 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9502DDC11168261007CFD97 /* AudioToolbox.framework */; };
 		A960CA8D1130786C00817886 /* input_osx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A960CA8C1130786C00817886 /* input_osx.cpp */; };
+		A9BF6E66116BFF0400E339A3 /* synth.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A9BF6E63116BFF0400E339A3 /* synth.cpp */; };
+		A9DB8E7F1184FEB8006FBF16 /* file_win32.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A9DB8E7E1184FEB8006FBF16 /* file_win32.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,14 +36,18 @@
 		28D7ACF70DDB3853001CB0EB /* isynthViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = isynthViewController.mm; sourceTree = "<group>"; };
 		29B97316FDCFA39411CA2CEA /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		32CA4F630368D1EE00C91783 /* isynth_Prefix.pch */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = isynth_Prefix.pch; sourceTree = "<group>"; };
-		8D1107310486CEB800E47090 /* isynth-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "isynth-Info.plist"; plistStructureDefinitionIdentifier = "com.apple.xcode.plist.structure-definition.iphone.info-plist"; sourceTree = "<group>"; };
 		A9502D6E111664C7007CFD97 /* audio_osx.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = audio_osx.cpp; path = ../audio_osx.cpp; sourceTree = SOURCE_ROOT; };
-		A9502D6F111664C7007CFD97 /* audio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = audio.cpp; path = ../audio.cpp; sourceTree = SOURCE_ROOT; };
 		A9502D7B111665E1007CFD97 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		A9502DDC11168261007CFD97 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		A9502DE4111682D9007CFD97 /* audio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = audio.h; path = ../audio.h; sourceTree = SOURCE_ROOT; };
 		A960CA8C1130786C00817886 /* input_osx.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = input_osx.cpp; path = ../input_osx.cpp; sourceTree = SOURCE_ROOT; };
 		A960CA8E11307A0500817886 /* input.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = input.h; path = ../input.h; sourceTree = SOURCE_ROOT; };
+		A9BF6E60116BFF0400E339A3 /* exception.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = exception.h; path = ../exception.h; sourceTree = SOURCE_ROOT; };
+		A9BF6E61116BFF0400E339A3 /* file.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = file.h; path = ../file.h; sourceTree = SOURCE_ROOT; };
+		A9BF6E63116BFF0400E339A3 /* synth.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = synth.cpp; path = ../synth.cpp; sourceTree = SOURCE_ROOT; };
+		A9BF6E64116BFF0400E339A3 /* synth.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = synth.h; path = ../synth.h; sourceTree = SOURCE_ROOT; };
+		A9BF6E6E116C027500E339A3 /* isynth-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "isynth-Info.plist"; sourceTree = "<group>"; };
+		A9DB8E7E1184FEB8006FBF16 /* file_win32.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = file_win32.cpp; path = ../file_win32.cpp; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,11 +100,15 @@
 		29B97315FDCFA39411CA2CEA /* Other Sources */ = {
 			isa = PBXGroup;
 			children = (
+				A9DB8E7E1184FEB8006FBF16 /* file_win32.cpp */,
+				A9BF6E60116BFF0400E339A3 /* exception.h */,
+				A9BF6E61116BFF0400E339A3 /* file.h */,
+				A9BF6E63116BFF0400E339A3 /* synth.cpp */,
+				A9BF6E64116BFF0400E339A3 /* synth.h */,
 				A960CA8E11307A0500817886 /* input.h */,
 				A960CA8C1130786C00817886 /* input_osx.cpp */,
 				A9502DE4111682D9007CFD97 /* audio.h */,
 				A9502D6E111664C7007CFD97 /* audio_osx.cpp */,
-				A9502D6F111664C7007CFD97 /* audio.cpp */,
 				32CA4F630368D1EE00C91783 /* isynth_Prefix.pch */,
 				29B97316FDCFA39411CA2CEA /* main.m */,
 			);
@@ -111,7 +120,7 @@
 			children = (
 				2899E5210DE3E06400AC0155 /* isynthViewController.xib */,
 				28AD733E0D9D9553002E5188 /* MainWindow.xib */,
-				8D1107310486CEB800E47090 /* isynth-Info.plist */,
+				A9BF6E6E116C027500E339A3 /* isynth-Info.plist */,
 			);
 			name = "Resources-iPad";
 			sourceTree = "<group>";
@@ -186,8 +195,9 @@
 				1D3623260D0F684500981E51 /* isynthAppDelegate.m in Sources */,
 				28D7ACF80DDB3853001CB0EB /* isynthViewController.mm in Sources */,
 				A9502D70111664C7007CFD97 /* audio_osx.cpp in Sources */,
-				A9502D71111664C7007CFD97 /* audio.cpp in Sources */,
 				A960CA8D1130786C00817886 /* input_osx.cpp in Sources */,
+				A9BF6E66116BFF0400E339A3 /* synth.cpp in Sources */,
+				A9DB8E7F1184FEB8006FBF16 /* file_win32.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
