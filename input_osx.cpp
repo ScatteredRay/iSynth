@@ -55,19 +55,22 @@ void populatePatchList(vector<string>& patches)
     
     CFURLRef patch = CFBundleCopyResourceURL(
                       Bundle,
-                      CFSTR("pad"),
+                      CFSTR("fmbass"),
                       CFSTR("pat"),
                       NULL);
                       
-    CFStringRef path = CFURLCopyPath(patch);
+    CFStringRef path = CFURLCopyFileSystemPath(patch, kCFURLPOSIXPathStyle);
     assert(path);
-    const char* cpath = CFStringGetCStringPtr(path, kCFStringEncodingASCII);
+    size_t pathlen = (CFStringGetLength(path) + 1) * sizeof(char);
+    char* cpath = (char*)malloc(pathlen);
+    CFStringGetCString(path, cpath, pathlen, kCFStringEncodingMacRoman);
     assert(cpath);
     patches.push_back(string(cpath));
     
     
     // The ptr is owned by the CFStringRef, but since we've copied it onto a
     // std::string we can just free everything! Yeah!
+    free(cpath);
     CFRelease(patch);
     CFRelease(path);
 }

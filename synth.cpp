@@ -663,10 +663,8 @@ Module *setupStream()
 
 void synthProduceStream(short *buffer, int samples)
 { 
-  static bool first = true;
-  if(first)
+  if(!g_stream_output)
   {
-    first = false;
     g_stream_output = setupStream();
   }
   
