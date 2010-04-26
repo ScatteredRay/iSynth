@@ -1,5 +1,6 @@
 #include "input.h"
 #include <CoreFoundation/CFBundle.h>
+#include <assert.h>
 
 float osx_x;
 float osx_y;
