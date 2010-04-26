@@ -21,6 +21,16 @@
 		A960CA8D1130786C00817886 /* input_osx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A960CA8C1130786C00817886 /* input_osx.cpp */; };
 		A9BF6E66116BFF0400E339A3 /* synth.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A9BF6E63116BFF0400E339A3 /* synth.cpp */; };
 		A9DB8E7F1184FEB8006FBF16 /* file_win32.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A9DB8E7E1184FEB8006FBF16 /* file_win32.cpp */; };
+		A9DB8EA0118521CA006FBF16 /* acousticdrums.pat in Resources */ = {isa = PBXBuildFile; fileRef = A9DB8E96118521CA006FBF16 /* acousticdrums.pat */; };
+		A9DB8EA1118521CA006FBF16 /* badpiano.pat in Resources */ = {isa = PBXBuildFile; fileRef = A9DB8E97118521CA006FBF16 /* badpiano.pat */; };
+		A9DB8EA2118521CA006FBF16 /* drums.pat in Resources */ = {isa = PBXBuildFile; fileRef = A9DB8E98118521CA006FBF16 /* drums.pat */; };
+		A9DB8EA3118521CA006FBF16 /* fmbass.pat in Resources */ = {isa = PBXBuildFile; fileRef = A9DB8E99118521CA006FBF16 /* fmbass.pat */; };
+		A9DB8EA4118521CA006FBF16 /* fmreed.pat in Resources */ = {isa = PBXBuildFile; fileRef = A9DB8E9A118521CA006FBF16 /* fmreed.pat */; };
+		A9DB8EA5118521CA006FBF16 /* lewp.pat in Resources */ = {isa = PBXBuildFile; fileRef = A9DB8E9B118521CA006FBF16 /* lewp.pat */; };
+		A9DB8EA6118521CA006FBF16 /* pad.pat in Resources */ = {isa = PBXBuildFile; fileRef = A9DB8E9C118521CA006FBF16 /* pad.pat */; };
+		A9DB8EA7118521CA006FBF16 /* retrigpulser.pat in Resources */ = {isa = PBXBuildFile; fileRef = A9DB8E9D118521CA006FBF16 /* retrigpulser.pat */; };
+		A9DB8EA8118521CA006FBF16 /* rubberbass.pat in Resources */ = {isa = PBXBuildFile; fileRef = A9DB8E9E118521CA006FBF16 /* rubberbass.pat */; };
+		A9DB8EA9118521CA006FBF16 /* toms.pat in Resources */ = {isa = PBXBuildFile; fileRef = A9DB8E9F118521CA006FBF16 /* toms.pat */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -48,6 +58,16 @@
 		A9BF6E64116BFF0400E339A3 /* synth.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = synth.h; path = ../synth.h; sourceTree = SOURCE_ROOT; };
 		A9BF6E6E116C027500E339A3 /* isynth-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "isynth-Info.plist"; sourceTree = "<group>"; };
 		A9DB8E7E1184FEB8006FBF16 /* file_win32.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = file_win32.cpp; path = ../file_win32.cpp; sourceTree = SOURCE_ROOT; };
+		A9DB8E96118521CA006FBF16 /* acousticdrums.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = acousticdrums.pat; path = ../patches/acousticdrums.pat; sourceTree = SOURCE_ROOT; };
+		A9DB8E97118521CA006FBF16 /* badpiano.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = badpiano.pat; path = ../patches/badpiano.pat; sourceTree = SOURCE_ROOT; };
+		A9DB8E98118521CA006FBF16 /* drums.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = drums.pat; path = ../patches/drums.pat; sourceTree = SOURCE_ROOT; };
+		A9DB8E99118521CA006FBF16 /* fmbass.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = fmbass.pat; path = ../patches/fmbass.pat; sourceTree = SOURCE_ROOT; };
+		A9DB8E9A118521CA006FBF16 /* fmreed.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = fmreed.pat; path = ../patches/fmreed.pat; sourceTree = SOURCE_ROOT; };
+		A9DB8E9B118521CA006FBF16 /* lewp.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = lewp.pat; path = ../patches/lewp.pat; sourceTree = SOURCE_ROOT; };
+		A9DB8E9C118521CA006FBF16 /* pad.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = pad.pat; path = ../patches/pad.pat; sourceTree = SOURCE_ROOT; };
+		A9DB8E9D118521CA006FBF16 /* retrigpulser.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = retrigpulser.pat; path = ../patches/retrigpulser.pat; sourceTree = SOURCE_ROOT; };
+		A9DB8E9E118521CA006FBF16 /* rubberbass.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = rubberbass.pat; path = ../patches/rubberbass.pat; sourceTree = SOURCE_ROOT; };
+		A9DB8E9F118521CA006FBF16 /* toms.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = toms.pat; path = ../patches/toms.pat; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -118,6 +138,16 @@
 		29B97317FDCFA39411CA2CEA /* Resources-iPad */ = {
 			isa = PBXGroup;
 			children = (
+				A9DB8E96118521CA006FBF16 /* acousticdrums.pat */,
+				A9DB8E97118521CA006FBF16 /* badpiano.pat */,
+				A9DB8E98118521CA006FBF16 /* drums.pat */,
+				A9DB8E99118521CA006FBF16 /* fmbass.pat */,
+				A9DB8E9A118521CA006FBF16 /* fmreed.pat */,
+				A9DB8E9B118521CA006FBF16 /* lewp.pat */,
+				A9DB8E9C118521CA006FBF16 /* pad.pat */,
+				A9DB8E9D118521CA006FBF16 /* retrigpulser.pat */,
+				A9DB8E9E118521CA006FBF16 /* rubberbass.pat */,
+				A9DB8E9F118521CA006FBF16 /* toms.pat */,
 				2899E5210DE3E06400AC0155 /* isynthViewController.xib */,
 				28AD733E0D9D9553002E5188 /* MainWindow.xib */,
 				A9BF6E6E116C027500E339A3 /* isynth-Info.plist */,
@@ -181,6 +211,16 @@
 			files = (
 				28AD733F0D9D9553002E5188 /* MainWindow.xib in Resources */,
 				2899E5220DE3E06400AC0155 /* isynthViewController.xib in Resources */,
+				A9DB8EA0118521CA006FBF16 /* acousticdrums.pat in Resources */,
+				A9DB8EA1118521CA006FBF16 /* badpiano.pat in Resources */,
+				A9DB8EA2118521CA006FBF16 /* drums.pat in Resources */,
+				A9DB8EA3118521CA006FBF16 /* fmbass.pat in Resources */,
+				A9DB8EA4118521CA006FBF16 /* fmreed.pat in Resources */,
+				A9DB8EA5118521CA006FBF16 /* lewp.pat in Resources */,
+				A9DB8EA6118521CA006FBF16 /* pad.pat in Resources */,
+				A9DB8EA7118521CA006FBF16 /* retrigpulser.pat in Resources */,
+				A9DB8EA8118521CA006FBF16 /* rubberbass.pat in Resources */,
+				A9DB8EA9118521CA006FBF16 /* toms.pat in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

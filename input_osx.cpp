@@ -1,4 +1,5 @@
 #include "input.h"
+#include <CoreFoundation/CFBundle.h>
 
 float osx_x;
 float osx_y;
@@ -45,10 +46,30 @@ void readInputAxis(int axis, float *buffer, int size)
         buffer[i] = src;
 }
 
+using namespace std;
+
 void populatePatchList(vector<string>& patches)
 {
-    //char *patch_filename = "patches/pad.pat";
-    if(patches.size() == 0) patches.push_back("patches/pad.pat");
+    CFBundleRef Bundle = CFBundleGetMainBundle();
+    assert(Bundle);
+    
+    CFURLRef patch = CFBundleCopyResourceURL(
+                      Bundle,
+                      CFSTR("pad"),
+                      CFSTR("pat"),
+                      NULL);
+                      
+    CFStringRef path = CFURLCopyPath(patch);
+    assert(path);
+    const char* cpath = CFStringGetCStringPtr(path, kCFStringEncodingASCII);
+    assert(cpath);
+    patches.push_back(string(cpath));
+    
+    
+    // The ptr is owned by the CFStringRef, but since we've copied it onto a
+    // std::string we can just free everything! Yeah!
+    CFRelease(patch);
+    CFRelease(path);
 }
 
 void setupLogging(vector<string>& log_list)
