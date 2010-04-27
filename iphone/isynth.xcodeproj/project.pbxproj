@@ -29,6 +29,8 @@
 		A9502D7C111665E1007CFD97 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9502D7B111665E1007CFD97 /* CoreFoundation.framework */; };
 		A9502DDD11168261007CFD97 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9502DDC11168261007CFD97 /* AudioToolbox.framework */; };
 		A960CA8D1130786C00817886 /* input_osx.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A960CA8C1130786C00817886 /* input_osx.cpp */; };
+		A996AA1E11866AF500CD448D /* test_input.pat in Resources */ = {isa = PBXBuildFile; fileRef = A996AA1C11866AF500CD448D /* test_input.pat */; };
+		A996AA1F11866AF500CD448D /* test_noinput.pat in Resources */ = {isa = PBXBuildFile; fileRef = A996AA1D11866AF500CD448D /* test_noinput.pat */; };
 		A9BF6E66116BFF0400E339A3 /* synth.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A9BF6E63116BFF0400E339A3 /* synth.cpp */; };
 		A9DB8E7F1184FEB8006FBF16 /* file_win32.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A9DB8E7E1184FEB8006FBF16 /* file_win32.cpp */; };
 /* End PBXBuildFile section */
@@ -62,6 +64,8 @@
 		A9502DE4111682D9007CFD97 /* audio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = audio.h; path = ../audio.h; sourceTree = SOURCE_ROOT; };
 		A960CA8C1130786C00817886 /* input_osx.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = input_osx.cpp; path = ../input_osx.cpp; sourceTree = SOURCE_ROOT; };
 		A960CA8E11307A0500817886 /* input.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = input.h; path = ../input.h; sourceTree = SOURCE_ROOT; };
+		A996AA1C11866AF500CD448D /* test_input.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = test_input.pat; path = ../patches/test_input.pat; sourceTree = SOURCE_ROOT; };
+		A996AA1D11866AF500CD448D /* test_noinput.pat */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = test_noinput.pat; path = ../patches/test_noinput.pat; sourceTree = SOURCE_ROOT; };
 		A9BF6E60116BFF0400E339A3 /* exception.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = exception.h; path = ../exception.h; sourceTree = SOURCE_ROOT; };
 		A9BF6E61116BFF0400E339A3 /* file.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = file.h; path = ../file.h; sourceTree = SOURCE_ROOT; };
 		A9BF6E63116BFF0400E339A3 /* synth.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = synth.cpp; path = ../synth.cpp; sourceTree = SOURCE_ROOT; };
@@ -138,6 +142,8 @@
 		29B97317FDCFA39411CA2CEA /* Resources-iPad */ = {
 			isa = PBXGroup;
 			children = (
+				A996AA1C11866AF500CD448D /* test_input.pat */,
+				A996AA1D11866AF500CD448D /* test_noinput.pat */,
 				A939E94B11852E3000EE073E /* acousticdrums.pat */,
 				A939E94C11852E3000EE073E /* badpiano.pat */,
 				A939E94D11852E3000EE073E /* drums.pat */,
@@ -221,6 +227,8 @@
 				A939E95C11852E3000EE073E /* retrigpulser.pat in Resources */,
 				A939E95D11852E3000EE073E /* rubberbass.pat in Resources */,
 				A939E95E11852E3000EE073E /* toms.pat in Resources */,
+				A996AA1E11866AF500CD448D /* test_input.pat in Resources */,
+				A996AA1F11866AF500CD448D /* test_noinput.pat in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
