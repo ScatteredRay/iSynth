@@ -64,6 +64,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <sstream>
 #include <map>
@@ -744,9 +745,11 @@ void synthProduceStream(short *buffer, int samples)
   {
 #ifdef __APPLE__
     *buffer++ = short(o[i]+o[i+1] * 16384);
+#elif __CHUMBY__
+	*buffer++ = ((long)o[i]*32767) | ((long)(o[i+1]*32767)<<16);
 #else
-    *buffer++ = short(o[i]   * 32767);
-    *buffer++ = short(o[i+1] * 32767);
+  *buffer++ = short(o[i]   * 32767);
+  *buffer++ = short(o[i+1] * 32767);
 #endif
   }
 }

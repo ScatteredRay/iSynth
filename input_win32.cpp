@@ -1,9 +1,11 @@
-#include "input.h"
-
 #include <cmath>
 #include <cstdio>
 #include <windows.h>
 #include <vector>
+
+#include "input.h"
+
+#pragma warning(disable:4996) // strncpy/strtok() purportedly unsafe
 
 using namespace std;
 

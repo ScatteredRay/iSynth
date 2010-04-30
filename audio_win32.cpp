@@ -108,11 +108,11 @@ void streamSound(unsigned int buffer_size)
       next_write_position %= (buffer_size*2);
 //      printf("nwp:%d, wws:%d, wwe:%d\n", next_write_position, write_window_start, write_window_end);
         
-      if(write_window_end < write_window_start) write_window_end +=
-        buffer_size*2;
+      if(write_window_end < write_window_start)
+        write_window_end += buffer_size*2;
       
-      if(next_write_position < write_window_start) next_write_position +=
-        buffer_size*2;
+      if(next_write_position < write_window_start)
+        next_write_position += buffer_size*2;
         
       if(next_write_position < write_window_end)
       {
@@ -132,7 +132,7 @@ void streamSound(unsigned int buffer_size)
         for(int i=0; i<2; i++)
           if(write_buffers[i])
             synthProduceStream((short *)(write_buffers[i]),
-                                         write_buffer_sizes[i]/4);
+                               write_buffer_sizes[i]/4);
    
         if(FAILED(buffer->Unlock(write_buffers[0], write_buffer_sizes[0], 
                                  write_buffers[1], write_buffer_sizes[1])))
