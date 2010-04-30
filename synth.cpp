@@ -59,6 +59,7 @@
 */
 #include "synth.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cfloat>
 #include <cmath>
@@ -227,6 +228,59 @@ class WaveOut
     int   m_length;
 };
 
+EXCEPTION(MismatchedProfilePop, Exception, "MismatchedProfilePop")
+
+bool sortby(const pair<double, string> &a, const pair<double, string> &b)
+{
+  return a.first > b.first;
+}
+
+class Profiler
+{
+  public:
+    char *describeTimeSpent(double audio_time)
+    {
+      static char buf[4096];
+      buf[0] = 0;
+      
+      vector<pair<double, string> > mlist;
+        
+      for(map<string, double>::iterator i=m_time_spent.begin();
+          i!=m_time_spent.end(); i++)        
+        mlist.push_back(pair<double, string>(i->second, i->first));
+
+      sort(mlist.begin(), mlist.end(), sortby);
+
+      double total_time = 0;
+      for(vector<pair<double, string> >::iterator i = mlist.begin();
+          i!=mlist.end(); i++)
+        total_time += i->first;
+
+      for(vector<pair<double, string> >::iterator i = mlist.begin();
+          i!=mlist.end(); i++)
+        sprintf(buf+strlen(buf), "%g (%2.2f%%) %s\n", i->first,
+                i->first/total_time*100, i->second.c_str());
+      sprintf(buf+strlen(buf), "total: %.2fs CPU / %.2fs audio (%g%%)",
+              total_time, audio_time, total_time*100/audio_time);
+      return buf;
+    }
+    
+    void clear()
+    {
+      m_time_spent.clear();
+    }
+    
+    void addTime(string name, double time)
+    {
+      if(m_time_spent.count(name) == 0) m_time_spent[name] = time;
+      else m_time_spent[name] += time;
+    }
+  
+    map<string, double> m_time_spent;
+};
+
+Profiler g_profiler;
+
 EXCEPTION_D(InvalidInputRangeExcept,  Exception, "Invalid Input Range")
 EXCEPTION_D(InvalidOutputRangeExcept, Exception, "Invalid Output Range")
 
@@ -243,12 +297,14 @@ class Module
     {
       if(m_waveout) delete m_waveout;
     }
+    
+    void setName(string name) { m_name = name; }
 
     virtual void fill(float last_fill, int samples) = 0;
     virtual void getOutputRange(float *out_min, float *out_max) = 0;
     virtual const char *moduleName() = 0;
     virtual void validateInputRange() = 0;
-    virtual bool stereo() const { return false; }
+    virtual bool stereo() const { return false; }    
 
     virtual const float *output(float last_fill, int samples)
     {
@@ -316,6 +372,7 @@ class Module
   protected:
     float m_output[max_buffer_size];
     float m_last_fill;
+    string m_name;
     //float m_within_lower_bound;
     //float m_within_upper_bound;
     WaveOut *m_waveout;
@@ -403,7 +460,9 @@ class Input : public Module
 
     void fill(float last_fill, int samples)
     {
+      double start = hires_time();      
       readInputAxis(m_axis, m_output, samples);
+      g_profiler.addTime("Input", hires_time() - start);
     }
   
     void getOutputRange(float *out_min, float *out_max)
@@ -596,6 +655,7 @@ void addModule(char *definition)
     throw(TooFewParamsExcept(def_copy));
   if(g_modules.count(name) > 0) throw(ReusedModuleNameExcept(def_copy+name));
   g_modules[name] = g_module_infos[type]->instantiate(params);
+  g_modules[name]->setName(name);
 }
 
 EXCEPTION  (NoOutputModuleExcept,  Exception, "No output module")
@@ -603,14 +663,17 @@ EXCEPTION  (OutputNotStereoExcept, Exception, "Output not stereo")
 EXCEPTION_D(CouldntOpenFileExcept, Exception, "Couldn't open file")
 
 static vector<FileRef> g_patches;
-static int g_patch_position = 0;
+static unsigned int g_patch_position = 0;
 static vector<FileRef> g_log_list;
 static Module *g_stream_output;
+float g_audio_time = 0;
 
 Module *loadPatch(const FileRef &filename)
 {
   g_modules.clear();
-
+  g_profiler.clear();
+  g_audio_time = 0;
+  
   File in(filename, File::READ);
 
   string s;
@@ -648,6 +711,11 @@ void synthNextPatch(int offset)
   g_stream_output = loadPatch(g_patches[g_patch_position]);
 }
 
+char *describeTimeSpent()
+{
+  return g_profiler.describeTimeSpent(g_audio_time);
+}
+
 Module *setupStream()
 {
   fillModuleList();
@@ -668,9 +736,9 @@ void synthProduceStream(short *buffer, int samples)
     g_stream_output = setupStream();
   }
   
-  static float time = 0;
-  const float *o = g_stream_output->output(time, samples);
-  time += 1.0;
+  double time = hires_time();  
+  const float *o = g_stream_output->output(g_audio_time, samples);
+  g_audio_time += float(samples) / sample_rate;  
   
   for(int i=0; i<samples*2; i+=2)
   {

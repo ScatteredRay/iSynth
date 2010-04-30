@@ -4,4 +4,6 @@
 void synthProduceStream(short *buffer, int samples);
 void synthNextPatch(int offset = 1);
 
+char *describeTimeSpent();
+
 #endif

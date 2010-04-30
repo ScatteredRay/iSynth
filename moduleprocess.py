@@ -52,10 +52,12 @@ class %s : public %sModule
         print "      const float *%s = m_%s->output(last_fill, samples);" % \
               (p[0], p[0])
     print """
+      double time = hires_time();
       for(int i=0; i<samples; i++)
       {
 %s      }
-    }""" % (_.fill)
+      g_profiler.addTime("%s", hires_time()-time);
+    }""" % (_.fill, _.name)
     
     print """
     void getOutputRange(float *out_min, float *out_max)

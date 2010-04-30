@@ -3,6 +3,9 @@
 #include <cmath>
 #include <cstdio>
 #include <windows.h>
+#include <vector>
+
+using namespace std;
 
 static HANDLE console;
 static float input_x, input_y, input_button;
@@ -157,4 +160,12 @@ void readInputAxis(int axis, float *buffer, int size)
   if(value >  1) value =  1;
   
   for(int i=0; i<size; i++) buffer[i] = value;
+}
+
+double hires_time()
+{
+  LARGE_INTEGER c, f;
+  QueryPerformanceCounter  (&c);
+  QueryPerformanceFrequency(&f);
+  return double(c.QuadPart)/double(f.QuadPart);
 }

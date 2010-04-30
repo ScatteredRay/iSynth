@@ -2,6 +2,7 @@
 #include "audio.h"
 #include "exception.h"
 #include "input.h"
+#include "synth.h"
 
 int main(int argc, char **argv)
 {
@@ -10,6 +11,7 @@ int main(int argc, char **argv)
     initInput(argc, argv);
     makeNoise();
     deinitInput();
+    puts(describeTimeSpent());
   }
   catch(Exception &e)
   {
