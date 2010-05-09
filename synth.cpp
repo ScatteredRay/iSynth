@@ -72,6 +72,7 @@
 #include <utility>
 #include <vector>
 
+#include "audio.h"
 #include "exception.h"
 #include "file.h"
 #include "input.h"
@@ -91,7 +92,6 @@ using namespace std;
 const float pi = 3.1415926535897932384626f, e = 2.71828183f;
 const float note_0 = 8.1757989156;
 const float middle_c = 261.625565;
-const int max_buffer_size = 4000;
 const int sample_rate = 44100;
 
 struct
@@ -733,9 +733,7 @@ Module *setupStream()
 void synthProduceStream(short *buffer, int samples)
 { 
   if(!g_stream_output)
-  {
     g_stream_output = setupStream();
-  }
   
   double time = hires_time();  
   const float *o = g_stream_output->output(g_audio_time, samples);

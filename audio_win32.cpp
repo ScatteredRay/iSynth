@@ -126,14 +126,15 @@ void streamSound(unsigned int buffer_size)
                                write_buffers+1,       write_buffer_sizes+1, 0)))
           throw(DsoundExcept("couldn't lock dsound buffer"));
         
-//        printf("[%p, %d], [%p, %d]\n", write_buffers[0], write_buffer_sizes[0],
-//                                       write_buffers[1], write_buffer_sizes[1]);
+        static short unified_buffer[max_buffer_size*4];
+        synthProduceStream(unified_buffer,
+                           (write_buffer_sizes[0]+write_buffer_sizes[1])/4);
+        memcpy(write_buffers[0], unified_buffer, write_buffer_sizes[0]);
+        if(write_buffers[1])
+          memcpy(write_buffers[1],
+                 unified_buffer+write_buffer_sizes[0]/sizeof(short), 
+                 write_buffer_sizes[1]);
 
-        for(int i=0; i<2; i++)
-          if(write_buffers[i])
-            synthProduceStream((short *)(write_buffers[i]),
-                               write_buffer_sizes[i]/4);
-   
         if(FAILED(buffer->Unlock(write_buffers[0], write_buffer_sizes[0], 
                                  write_buffers[1], write_buffer_sizes[1])))
           throw(DsoundExcept("couldn't unlock dsound buffer"));
