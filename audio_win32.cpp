@@ -41,8 +41,7 @@ void setupSound(unsigned int buffer_size)
     0,                    // "reserved"
     &wave_format,         // wave format descriptor
     DS3DALG_DEFAULT       // 3d virtualization algorithm
-  };
-  
+  };  
   
   if(FAILED(dsound->CreateSoundBuffer(&buffer_descriptor, &buffer, 0)))
     throw(DsoundExcept("couldn't create dsound buffer"));

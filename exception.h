@@ -73,4 +73,8 @@ class Exception
       std::string data;                               \
   };
 
+EXCEPTION_D(AssertionException, Exception, "assertion fail")
+
+#define ASSERT(s) if(!(s)) throw AssertionException(#s);
+
 #endif

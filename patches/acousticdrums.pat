@@ -1,11 +1,11 @@
-Input x(0)
-Input y(1)
-Input touch(2)
+200 Input x(0)
+200 Input y(1)
+200 Input touch(2)
 
-Rescaler xpos(x, 0, 1)
-Rescaler ypos(y, 0, 1)
-Rescaler xneg(x, 1, 0)
-Rescaler yneg(y, 1, 0)
+200 Rescaler xpos(x, 0, 1)
+200 Rescaler ypos(y, 0, 1)
+200 Rescaler xneg(x, 1, 0)
+200 Rescaler yneg(y, 1, 0)
 
 Sample kick     ("samples/kick.wav",      261.2, touch, 1, 1)
 Sample snare    ("samples/snare.wav",     261.2, touch, 1, 1)

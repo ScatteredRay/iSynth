@@ -22,16 +22,17 @@ class Saw : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-      const float *retrigger = m_retrigger->output(last_fill, samples);
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *retrigger = m_retrigger->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = (m_position-0.5f)*2;
-        m_position += frequency[i] / sample_rate;
+        m_position += frequency[i] / m_sample_rate;
         m_position -= int(m_position);
-        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
           m_position = 0;
         m_last_trigger = retrigger[i];
       }
@@ -79,17 +80,18 @@ class Pulse : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-      const float *pulsewidth = m_pulsewidth->output(last_fill, samples);
-      const float *retrigger = m_retrigger->output(last_fill, samples);
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *pulsewidth = m_pulsewidth->output(last_fill, samples, m_sample_rate);
+      const float *retrigger = m_retrigger->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = (m_position > pulsewidth[i]) ? -1.0f:1.0f;
-        m_position += frequency[i] / sample_rate;
+        m_position += frequency[i] / m_sample_rate;
         m_position -= int(m_position);
-        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
           m_position = 0;
         m_last_trigger = retrigger[i];
       }
@@ -138,17 +140,18 @@ class Sine : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-      const float *retrigger = m_retrigger->output(last_fill, samples);
-      const float *phase_offset = m_phase_offset->output(last_fill, samples);
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *retrigger = m_retrigger->output(last_fill, samples, m_sample_rate);
+      const float *phase_offset = m_phase_offset->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = sin((m_position+phase_offset[i])*2*pi);
-        m_position += frequency[i] / sample_rate;
+        m_position += frequency[i] / m_sample_rate;
         m_position -= int(m_position);
-        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
           m_position = 0;
         m_last_trigger = retrigger[i];
       }
@@ -196,17 +199,18 @@ class Triangle : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-      const float *retrigger = m_retrigger->output(last_fill, samples);
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *retrigger = m_retrigger->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         if(m_position < .5f) *output++ = (m_position-0.25f) *  4;
         else                 *output++ = (m_position-0.75f) * -4;
-        m_position += frequency[i] / sample_rate;
+        m_position += frequency[i] / m_sample_rate;
         m_position -= int(m_position);
-        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
           m_position = 0;
         m_last_trigger = retrigger[i];
       }
@@ -251,7 +255,8 @@ class Noise : public Module
       float *output = m_output;
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = 2.0f*rand()/RAND_MAX - 1.0;
       }
@@ -292,10 +297,11 @@ class Within : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = (input[i]>=m_min && input[i]<=m_max) ? 1 : 0;
       }
@@ -348,20 +354,21 @@ class Sample : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-      const float *trigger = m_trigger->output(last_fill, samples);
-      const float *loop_start = m_loop_start->output(last_fill, samples);
-      const float *loop_end = m_loop_end->output(last_fill, samples);
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *trigger = m_trigger->output(last_fill, samples, m_sample_rate);
+      const float *loop_start = m_loop_start->output(last_fill, samples, m_sample_rate);
+      const float *loop_end = m_loop_end->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = m_sample->valueAt(m_position);
-        if(m_last_trigger < 0.1 && trigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && trigger[i] >= 0.9)
         {
           m_position = 0;
           m_rate_coefficient = m_sample->nativeSampleRate() / middle_c /
-                               m_sample->length() / sample_rate;
+                               m_sample->length() / m_sample_rate;
         }
         m_last_trigger = trigger[i];
         m_position += frequency[i] * m_rate_coefficient;
@@ -428,10 +435,11 @@ class Rescaler : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = (input[i]-m_from_min) / m_from_range * m_to_range + m_to_min;
       }
@@ -491,7 +499,7 @@ class Filter : public Module
     const char *moduleName() { return "Filter"; }
     inline void recalculateFilter(float cutoff, float resonance)
     {
-      m_f = 2.0f * cutoff / sample_rate;
+      m_f = 2.0f * cutoff / m_sample_rate;
       m_k = 3.6f*m_f - 1.6f*m_f*m_f -1.0f;
       m_p = (m_k+1.0f)*0.5f;
       m_scale = pow(e, (1.0f-m_p)*1.386249f);
@@ -502,12 +510,13 @@ class Filter : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *cutoff = m_cutoff->output(last_fill, samples);
-      const float *resonance = m_resonance->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *cutoff = m_cutoff->output(last_fill, samples, m_sample_rate);
+      const float *resonance = m_resonance->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         if(m_oldcutoff != cutoff[i] || m_oldresonance != resonance[i])
         {
@@ -585,11 +594,12 @@ class Multiply : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *a = m_a->output(last_fill, samples);
-      const float *b = m_b->output(last_fill, samples);
+      const float *a = m_a->output(last_fill, samples, m_sample_rate);
+      const float *b = m_b->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = a[i]*b[i];
       }
@@ -635,11 +645,12 @@ class Add : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *a = m_a->output(last_fill, samples);
-      const float *b = m_b->output(last_fill, samples);
+      const float *a = m_a->output(last_fill, samples, m_sample_rate);
+      const float *b = m_b->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = a[i] + b[i];
       }
@@ -683,10 +694,11 @@ class Quantize : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = floor(input[i]+0.5);
       }
@@ -718,9 +730,6 @@ class EnvelopeGenerator : public Module
       m_dec = parameters[2]->m_float;
       m_sus = parameters[3]->m_float;
       m_rel = parameters[4]->m_float;
-      m_position = 0;
-      m_coefficient = 0;
-      m_destination = 0;
       m_held = false;
       m_stage = 0;
 
@@ -731,59 +740,56 @@ class EnvelopeGenerator : public Module
     }
 
     const char *moduleName() { return "EnvelopeGenerator"; }
+    Curve m_curve;
     enum { IDLE = 0, ATTACK, DECAY, SUSTAIN, RELEASE };
 
     
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *gate = m_gate->output(last_fill, samples);
+      const float *gate = m_gate->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         if(!m_held)
         {
           if(gate[i] > 0.9)
           {
-            m_stage       = ATTACK;
-            m_coefficient = onepoleCoefficient(m_att);
-            m_destination = 1;
-            m_held        = true;
+            m_stage = ATTACK;
+            m_curve.start(m_curve.position(), 1, m_att, m_sample_rate);
+            m_held = true;
           }
         }
         else
         {
           if(gate[i] < 0.1)
           {
-            m_stage       = RELEASE;
-            m_coefficient = onepoleCoefficient(m_rel);
-            m_destination = 0;
-            m_held        = false;
+            m_stage = RELEASE;
+            m_curve.start(m_curve.position(), 0.001, m_rel, m_sample_rate);
+            m_held = false;
           }
         }
-        m_position = m_position * m_coefficient + m_destination * (1-m_coefficient);
+        m_curve.step();
         switch(m_stage)
         {
           case ATTACK:
-            if(m_position >= 0.999)
+            if(m_curve.finished())
             {
-              m_stage       = DECAY;
-              m_coefficient = onepoleCoefficient(m_dec);
-              m_destination = m_sus;
+              m_stage = DECAY;
+              m_curve.start(m_curve.position(), m_sus, m_dec, m_sample_rate);
             }
             break;
           case RELEASE:
-            if(m_position <= 0.00001)
+            if(m_curve.finished())
             {
-              m_stage       = IDLE;
-              m_position    = 0;
-              m_destination = 0;
-              m_coefficient = 0;
+              m_stage = IDLE;
+              m_curve.start(0, 0, 1, m_sample_rate);
             }
             break;
         }
-        *output++ = m_position;
+        *output++ = m_curve.position();
       }
       g_profiler.addTime("EnvelopeGenerator", hires_time()-time);
     }
@@ -804,12 +810,68 @@ class EnvelopeGenerator : public Module
     float m_dec;
     float m_sus;
     float m_rel;
-    float m_position;
-    float m_coefficient;
-    float m_destination;
     bool m_held;
     int m_stage;
 };
+/*module EnvelopeGenerator(gate, float att, float dec, float sus, float rel):
+  members:
+    float position = 0, coefficient = 0, destination = 0
+    bool  held     = false
+    int   stage    = 0
+  misc:
+    enum { IDLE = 0, ATTACK, DECAY, SUSTAIN, RELEASE };
+  output_range:
+    *out_min = 0;
+    *out_max = 1;
+  input_range:
+    gate: -1, 1
+  fill:
+    if(!m_held)
+    {
+      if(gate[i] > 0.9)
+      {
+        m_stage       = ATTACK;
+        m_coefficient = onepoleCoefficient(m_att);
+        m_destination = 1;
+        m_held        = true;
+      }
+    }
+    else
+    {
+      if(gate[i] < 0.1)
+      {
+        m_stage       = RELEASE;
+        m_coefficient = onepoleCoefficient(m_rel);
+        m_destination = 0;
+        m_held        = false;
+      }
+    }
+
+    m_position = m_position * m_coefficient + m_destination * (1-m_coefficient);
+
+    switch(m_stage)
+    {
+      case ATTACK:
+        if(m_position >= 0.999)
+        {
+          m_stage       = DECAY;
+          m_coefficient = onepoleCoefficient(m_dec);
+          m_destination = m_sus;
+        }
+        break;
+      case RELEASE:
+        if(m_position <= 0.00001)
+        {
+          m_stage       = IDLE;
+          m_position    = 0;
+          m_destination = 0;
+          m_coefficient = 0;
+        }
+        break;
+    }
+
+    *output++ = m_position;
+*/
 
 
 class SampleAndHold : public Module
@@ -835,13 +897,14 @@ class SampleAndHold : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *source = m_source->output(last_fill, samples);
-      const float *trigger = m_trigger->output(last_fill, samples);
+      const float *source = m_source->output(last_fill, samples, m_sample_rate);
+      const float *trigger = m_trigger->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
-        if(m_last_trigger < 0.1 && trigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && trigger[i] >= 0.9)
           m_value = source[i];
         m_last_trigger = trigger[i];
         *output++ = m_value;
@@ -887,11 +950,12 @@ class Limiter : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *preamp = m_preamp->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *preamp = m_preamp->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = tanh(input[i] * preamp[i]);
       }
@@ -932,10 +996,11 @@ class Rectifier : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = abs(input[i]);
       }
@@ -978,12 +1043,13 @@ class Clipper : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *min = m_min->output(last_fill, samples);
-      const float *max = m_max->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *min = m_min->output(last_fill, samples, m_sample_rate);
+      const float *max = m_max->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         float sample = input[i];
         if(sample > max[i]) sample = max[i];
@@ -1031,11 +1097,12 @@ class BitCrusher : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *range = m_range->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *range = m_range->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = int(input[i] * range[i]) / range[i];
       }
@@ -1085,12 +1152,13 @@ class AttackRelease : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *attack = m_attack->output(last_fill, samples);
-      const float *release = m_release->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *attack = m_attack->output(last_fill, samples, m_sample_rate);
+      const float *release = m_release->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         if(attack [i] != m_current_attack )
           m_current_attack   = attack [i], m_up   = onepoleCoefficient(attack [i]);
@@ -1149,10 +1217,11 @@ class SlewLimiter : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         if(input[i] > m_last) m_last = input[i]*m_up   + m_last*(1-m_up  );
         else                  m_last = input[i]*m_down + m_last*(1-m_down);
@@ -1220,10 +1289,11 @@ class NoteToFrequency : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = freqFromNote(input[i]);
       }
@@ -1268,10 +1338,11 @@ class MixDown : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = *input++ + *input++;
       }
@@ -1314,11 +1385,12 @@ class Pan : public StereoModule
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *position = m_position->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *position = m_position->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = input[i] * (1.0-position[i]);
         *output++ = input[i] *      position[i];
@@ -1361,11 +1433,12 @@ class StereoAdd : public StereoModule
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *a = m_a->output(last_fill, samples);
-      const float *b = m_b->output(last_fill, samples);
+      const float *a = m_a->output(last_fill, samples, m_sample_rate);
+      const float *b = m_b->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = *a++ + *b++;
         *output++ = *a++ + *b++;
@@ -1402,7 +1475,7 @@ class PingPongDelay : public StereoModule
       m_wet = parameters[3]->m_module;
       m_dry = parameters[4]->m_module;
       m_feedback = parameters[5]->m_module;
-      m_length = int(m_len*sample_rate);
+      m_length = int(m_len*m_sample_rate);
       m_buffer_left = new float[m_length];
       m_buffer_right = new float[m_length];
       m_read_pos = 1;
@@ -1429,13 +1502,14 @@ class PingPongDelay : public StereoModule
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *wet = m_wet->output(last_fill, samples);
-      const float *dry = m_dry->output(last_fill, samples);
-      const float *feedback = m_feedback->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *wet = m_wet->output(last_fill, samples, m_sample_rate);
+      const float *dry = m_dry->output(last_fill, samples, m_sample_rate);
+      const float *feedback = m_feedback->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         float left_sample = m_buffer_left[m_read_pos]*m_filter +
                             m_last_sample_left*(1-m_filter);
@@ -1505,11 +1579,12 @@ class Rotate : public StereoModule
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *angle = m_angle->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *angle = m_angle->output(last_fill, samples, m_sample_rate);
 
       double time = hires_time();
-      for(int i=0; i<samples; i++)
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         float left  = *input++;
         float right = *input++;
@@ -1587,8 +1662,8 @@ class Delay : public Module
   public:
     Delay(float length, float filter, Module &input, Module &wet, Module &dry,
           Module &feedback, Module &speed)
-    : m_buffer(new float[int(length*sample_rate)]),
-      m_length(int(length*sample_rate)),
+    : m_buffer(new float[int(length*m_sample_rate)]),
+      m_length(int(length*m_sample_rate)),
       m_read_pos(1), m_write_pos(0), m_last_sample(0), m_filter(filter),
       m_input(input), m_wet(wet), m_dry(dry), m_feedback(feedback),
       m_speed(speed)
