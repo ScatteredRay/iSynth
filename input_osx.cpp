@@ -1,6 +1,8 @@
-#include "input.h"
-#include <CoreFoundation/CFBundle.h>
 #include <assert.h>
+#include <CoreFoundation/CFBundle.h>
+#include "input.h"
+#include <mach/mach.h>
+#include <mach/mach_time.h>
 
 float osx_x;
 float osx_y;
@@ -78,4 +80,14 @@ void populatePatchList(vector<string>& patches)
 
 void setupLogging(vector<string>& log_list)
 {
+}
+
+double hires_time()
+{
+  mach_timebase_info_data_t info;
+  mach_timebase_info(&info);
+  uint64_t time = mach_absolute_time();
+  uint64_t nanoseconds = time * info.numer / info.denom;
+  return 
+    (double)nanoseconds / 1000000000.0;
 }
