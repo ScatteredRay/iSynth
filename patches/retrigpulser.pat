@@ -19,23 +19,23 @@
 200 Multiply freq(note_freq, vibrato)
 
 #noise
-200 Sine mult_unit(0.5, touch)
-200 Rescaler mult(mult_unit, .5, 1.5)
-200 Multiply detune(freq, mult)
+Sine mult_unit(0.5, touch)
+Rescaler mult(mult_unit, .5, 1.5)
+Multiply detune(freq, mult)
 Pulse osc_retrigger(freq)
 Triangle osc(detune, osc_retrigger)
 
 #filter
-200 EnvelopeGenerator env(touch, 0.01, 0.7, 0.5, 0.1)
-200 Rescaler cutoff_env(env, 400, 1200)
-200 Rescaler cutoff_y(y, 0.25, 1)
-200 Multiply cutoff(cutoff_y, cutoff_env)
-200 Add cutoff_offset(cutoff, freq)
+EnvelopeGenerator env(touch, 0.01, 0.7, 0.5, 0.1)
+Rescaler cutoff_env(env, 400, 1200)
+Rescaler cutoff_y(y, 0.25, 1)
+Multiply cutoff(cutoff_y, cutoff_env)
+Add cutoff_offset(cutoff, freq)
 Filter filter(osc, cutoff_offset, 0.7)
 
 #decimator
-200 Rescaler trigger_freq_coef(y, 8, 41)
-200 Multiply trigger_freq(freq, trigger_freq_coef)
+Rescaler trigger_freq_coef(y, 8, 41)
+Multiply trigger_freq(freq, trigger_freq_coef)
 Pulse trigger(trigger_freq, 0.5, 0)
 
 SampleAndHold crushed(filter, trigger)

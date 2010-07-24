@@ -7,7 +7,7 @@
 200 Rescaler note(x, 24, 48)
 200 Quantize note_quant(note)
 200 NoteToFrequency note_freq(note_quant, "lydian")
-SlewLimiter note_freq_sl(note_freq, .0005, .0005)
+200 SlewLimiter note_freq_sl(note_freq, .05, .05)
 
 #vibrato
 200 Sine vibrato_lfo(3)

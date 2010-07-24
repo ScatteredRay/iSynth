@@ -20,7 +20,6 @@
    - switch
    - DADSR, parameterized shape
    - wave terrain
-   - use yacc to parse modules?
    - support for arbitrary parameter count
      + sequencer (retriggerable)
    - additional filters?  eq?
@@ -322,10 +321,13 @@ class Module
 
     virtual void convertToRate(int output_rate, int samples)
     {      
+      double start_time = hires_time();
+      
       int from = max(1.0f, float(samples)*m_sample_rate/g_sample_rate);
       int to   = max(1.0f, float(samples)*  output_rate/g_sample_rate);
-      float *buf         = m_converted_outputs[output_rate].first;
-      float  last_sample = m_converted_outputs[output_rate].second;
+      float *buf      = m_converted_outputs[output_rate].first;
+      float  position = m_converted_outputs[output_rate].second;
+      if(m_last_fill == 0) position = m_output[0];
       
       if(from==1) for(int i=0; i<to; i++) *buf++ = *m_output;        
       else if(to < from) // downsample
@@ -340,9 +342,25 @@ class Module
       }
       else // upsample
       {
-        float delta = float(from-1) / to;
+        int per = to/from;
+        int segments = from;
+
+        for(int i=0; i<from; i++)
+        {
+          if(i+1 == from) per += to - per*from;
+          float delta = (m_output[i] - position) / per;
+          for(int j=0; j<per-1; j++)
+          {
+            *buf++ = position;
+            position += delta;
+          }
+          position = m_output[i];
+          *buf++ = position;
+        }
+        /*float delta = float(from-1) / to;
         float pos = 0.0;
         int old_pos = 0;
+        if(m_last_fill == 0) last_sample = m_output[0];
         for(int i=0; i<to; i++)
         {
           *buf++ = interpolate(last_sample, m_output[int(pos)], pos-int(pos));
@@ -352,10 +370,11 @@ class Module
             last_sample = m_output[old_pos];
             old_pos = int(pos);
           }
-        }
-        last_sample = m_output[int(pos)];
+        }*/
       }
-      m_converted_outputs[output_rate].second = last_sample;
+      m_converted_outputs[output_rate].second = position;
+      
+      g_profiler.addTime("Resampling", hires_time() - start_time);
     }
 
     virtual const float *output(float last_fill, int samples, int output_rate)
@@ -364,7 +383,6 @@ class Module
       {
         validateInputRange();
         fill(last_fill, samples);
-        m_last_fill = last_fill;
         int sample_count = max(1.0f, samples*m_sample_rate/g_sample_rate);
         if(m_waveout) m_waveout->writeBuffer(m_output, sample_count);
         #ifndef NDEBUG
@@ -373,18 +391,19 @@ class Module
         
         for(ResampleBufferMap::iterator i = m_converted_outputs.begin();
             i != m_converted_outputs.end(); i++)
-          convertToRate(i->first, samples);        
+          convertToRate(i->first, samples);
       }
-
-      if(output_rate == m_sample_rate) return m_output;
       
-      if(m_converted_outputs.count(output_rate) == 0)
+      if(output_rate != m_sample_rate && m_converted_outputs.count(output_rate) == 0)
       {
         m_converted_outputs[output_rate] =
           pair<float *, float>(new float[max_buffer_size], 0);
         convertToRate(output_rate, samples);
       }
       
+      m_last_fill = last_fill;
+      
+      if(output_rate == m_sample_rate) return m_output;
       return m_converted_outputs[output_rate].first;
     }
 
@@ -421,7 +440,7 @@ class Module
       getOutputRange(&min, &max);
       for(int i=0; i<samples; i++)
       {
-        if(buffer[i] < min || m_output[i] > max)
+        if(buffer[i] < min || buffer[i] > max)
         {
           static char error[256];
           getOutputRange(&min, &max);

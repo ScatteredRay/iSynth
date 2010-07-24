@@ -36,8 +36,11 @@ Add osc_mix(osc_1, osc_2)
 Filter filter(osc_mix, cutoff, 0.7)
 Multiply notes(filter, vol)
 
+#Sine notes(200)
+
 #panning
 200 Rescaler panpos(x, 0.15, 0.85)
-Pan panned_notes(notes, panpos)
+Multiply panpos_(panpos, 1)
+Pan panned_notes(notes, 0.5)
 PingPongDelay delay(0.5, 0.5, notes, 0.5, 0, 0.3)
 StereoAdd output(delay, panned_notes)
