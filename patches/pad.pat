@@ -36,8 +36,6 @@ Add osc_mix(osc_1, osc_2)
 Filter filter(osc_mix, cutoff, 0.7)
 Multiply notes(filter, vol)
 
-#Sine notes(200)
-
 #panning
 200 Rescaler panpos(x, 0.15, 0.85)
 Multiply panpos_(panpos, 1)

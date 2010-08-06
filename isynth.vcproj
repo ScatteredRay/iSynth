@@ -479,6 +479,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\patches\squelch.pat"
+				>
+			</File>
+			<File
 				RelativePath=".\patches\test_input.pat"
 				>
 				<FileConfiguration
