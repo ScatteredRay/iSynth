@@ -419,6 +419,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\patches\orchhit.pat"
+				>
+			</File>
+			<File
 				RelativePath=".\patches\pad.pat"
 				>
 				<FileConfiguration

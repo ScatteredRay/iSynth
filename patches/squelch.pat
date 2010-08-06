@@ -9,10 +9,7 @@
 200 NoteToFrequency freq(note_quant, "minor")
 
 #noise
-#Multiply freq_mult(freq, 1.001)
 Saw osc(freq)
-#Saw osc2(freq_mult)
-#Add oscs(osc1, osc2)
 
 #filter
 200 EnvelopeGenerator cutoff_env_unit(touch, 0, 2, 0, 0.1)
