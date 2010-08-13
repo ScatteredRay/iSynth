@@ -4,9 +4,7 @@
 200 Input touch(2)
  
 #note
-200 Rescaler note(x, 24, 48)
-200 Quantize note_quant(note)
-200 NoteToFrequency freq(note_quant, "pentminor")
+200 XToFrequency freq(x)
 
 #noise
 2000 EnvelopeGenerator mod_amt(touch, 0.01, 0.5, 0.2, 0.2)

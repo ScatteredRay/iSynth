@@ -4,9 +4,7 @@
 200 Input touch(2)
 
 #note
-200 Rescaler note(x, 46, 70)
-200 Quantize note_quant(note)
-200 NoteToFrequency note_freq(note_quant, "mixolydian")
+200 XToFrequency note_freq(x)
 
 # vibrato
 200 Sine vibrato_lfo(5)

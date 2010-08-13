@@ -4,9 +4,7 @@
 200 Input touch(2)
 
 #note
-200 Rescaler note(x, 24, 48)
-200 Quantize note_quant(note)
-200 NoteToFrequency note_freq(note_quant, "lydian")
+200 XToFrequency note_freq(x)
 200 SlewLimiter note_freq_sl(note_freq, .05, .05)
 
 #vibrato

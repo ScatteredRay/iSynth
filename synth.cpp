@@ -71,9 +71,8 @@
 #include <utility>
 #include <vector>
 
-#include "audio.h"
+#include "io.h"
 #include "exception.h"
-#include "file.h"
 #include "input.h"
 
 using namespace std;
@@ -93,10 +92,13 @@ const float note_0 = 8.1757989156;
 const float middle_c = 261.625565;
 const int g_sample_rate = 44100;
 
-struct
-{ const char *name;
-  const char *steps;
-} scales[] =
+char *g_keys[] =
+{
+  "C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb",
+  "B"
+};
+
+scale g_scales[] =
 {
   { "major",      "\2\2\1\2\2\2\1" },
   { "minor",      "\2\1\2\2\1\2\2" },
@@ -117,6 +119,12 @@ struct
   { "octave",     "\12" },
   { 0,            0 }
 };
+
+int g_key = 0;
+char g_closest_notes[128];
+FileRef g_patch("pad.pat");
+int g_octave_range = 2;
+int g_start_octave = 4;
 
 EXCEPTION_D(UnhandledWaveFormatException, Exception,
             "Can only handle 16-bit PCM .wav files")
@@ -357,20 +365,6 @@ class Module
           position = m_output[i];
           *buf++ = position;
         }
-        /*float delta = float(from-1) / to;
-        float pos = 0.0;
-        int old_pos = 0;
-        if(m_last_fill == 0) last_sample = m_output[0];
-        for(int i=0; i<to; i++)
-        {
-          *buf++ = interpolate(last_sample, m_output[int(pos)], pos-int(pos));
-          pos += delta;
-          if(old_pos < int(pos))
-          {
-            last_sample = m_output[old_pos];
-            old_pos = int(pos);
-          }
-        }*/
       }
       m_converted_outputs[output_rate].second = position;
       
@@ -658,6 +652,12 @@ float onepoleCoefficient(float time)
          (360481000.0*pow(time, 1.1f) + 100000);
 }
 
+inline float freqFromX(float x)
+{
+  int note = (x+1)/2*g_octave_range*12+g_start_octave*12;
+  return pow(2.0, (g_closest_notes[note]+g_key)/12.0) * note_0;
+}
+
 map<string, ModuleInfo *> g_module_infos;
 
 EXCEPTION_D(ModuleExcept, Exception, "Module exception")
@@ -789,8 +789,6 @@ EXCEPTION  (NoOutputModuleExcept,  Exception, "No output module")
 EXCEPTION  (OutputNotStereoExcept, Exception, "Output not stereo")
 EXCEPTION_D(CouldntOpenFileExcept, Exception, "Couldn't open file")
 
-static vector<FileRef> g_patches;
-static int g_patch_position = 0;
 static vector<FileRef> g_log_list;
 static Module *g_stream_output;
 float g_audio_time = 0;
@@ -801,7 +799,7 @@ Module *loadPatch(const FileRef &filename)
   g_profiler.clear();
   g_audio_time = 0;
   
-  File in(filename, File::READ);
+  File in(string("patches/") + filename, File::READ);
 
   string s;
   while(!in.eof())
@@ -828,14 +826,42 @@ Module *loadPatch(const FileRef &filename)
   return output;
 }
 
-void synthNextPatch(int offset)
+void synthSetRange(int start_octave, int octave_range)
 {
-  if(g_patches.size() == 0) return;
-  
-  g_patch_position += offset;
-  if(g_patch_position < 0) g_patch_position = g_patches.size()-1;
-  if(g_patch_position >= g_patches.size()) g_patch_position = 0;
-  g_stream_output = loadPatch(g_patches[g_patch_position]);
+  g_octave_range = octave_range;
+  g_start_octave = start_octave;
+}
+
+void synthSetPatch(const FileRef &patch)
+{
+  g_patch = patch;
+  g_stream_output = loadPatch(patch);  
+}
+
+void synthSetKey(int key)
+{
+  g_key = key;
+}
+
+void synthSetScale(const char *name)
+{
+  char *steps;
+  for(int i=0; g_scales[i].name; i++)
+    if(strcmp(name, g_scales[i].name) == 0)
+      steps = (char *)(g_scales[i].steps);
+  if(steps == 0)
+    throw(ModuleExcept(string("Unknown scale: ")+name));
+  for(int note=0; note<128; note++)
+  {
+    int closest = -128;
+    int step = 0;
+    for(int trying=0; trying<128; trying+=steps[step])
+    {
+      if(steps[++step] == 0) step = 0;
+      if(abs(trying-note) < abs(closest-note)) closest = trying;
+    }
+    g_closest_notes[note] = closest;
+  }
 }
 
 char *describeTimeSpent()
@@ -848,12 +874,10 @@ Module *setupStream()
   fillModuleList();
   g_module_infos["Input"] = new ModuleInfo("Input", Input::create);
   g_module_infos["Input"]->addParameter("axis", "int");
+  
+  populateLogList(g_log_list);
 
-  populatePatchList(g_patches);
-
-  setupLogging(g_log_list);
-
-  return loadPatch(g_patches[0]);
+  return loadPatch(g_patch);
 }
 
 void synthProduceStream(short *buffer, int samples)

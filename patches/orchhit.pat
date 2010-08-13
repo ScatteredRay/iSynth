@@ -4,9 +4,7 @@ Input y(1)
 Input touch(2)
 
 #note
-Rescaler note(x, 48, 72)
-Quantize note_quant(note)
-NoteToFrequency freq(note_quant, "major")
+200 XToFrequency freq(x)
 
 Sample osc("samples/orchhit.wav", freq, touch, 1, 1)
 

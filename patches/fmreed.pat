@@ -4,9 +4,7 @@
 200 Input touch(2)
  
 #note
-200 Rescaler note(x, 48, 72)
-200 Quantize note_quant(note)
-200 NoteToFrequency note_freq(note_quant, "minor")
+200 XToFrequency note_freq(x)
 
 #vibrato
 2000 EnvelopeGenerator vibrato_env(touch, 3, 1, 1, 1)

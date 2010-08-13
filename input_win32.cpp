@@ -40,10 +40,10 @@ void initInput(int _argc, char **_argv)
   SetConsoleWindowInfo(GetStdHandle(STD_OUTPUT_HANDLE), true, &rect);;
   COORD origin = { 0, 0 };
   DWORD out;
-  FillConsoleOutputCharacter(GetStdHandle(STD_OUTPUT_HANDLE), '.', 80*50,
+  FillConsoleOutputCharacter(GetStdHandle(STD_OUTPUT_HANDLE), ' ', 80*50,
                              origin, &out);
   gotoXY(0, 0);
-  printf("Click to make noise, escape to quit.");
+  printf("Click to make noise, escape to quit. Arrow keys to change parameters.");
 }
 
 int argCount() { return argc; }
@@ -55,13 +55,13 @@ char *getArg(int n)
 
 void populatePatchList(vector<string>& patches)
 {
-    //char *patch_filename = "patches/pad.pat";
-    for(int i=1; i<argCount(); i++)
-        if(!strchr(getArg(i), ':')) patches.push_back(getArg(i));
-    if(patches.size() == 0) patches.push_back("patches/pad.pat");
+  //char *patch_filename = "patches/pad.pat";
+  for(int i=1; i<argCount(); i++)
+      if(!strchr(getArg(i), ':')) patches.push_back(getArg(i));
+  if(patches.size() == 0) patches.push_back("patches/pad.pat");
 }
 
-void setupLogging(vector<string>& log_list)
+void populateLogList(vector<string>& log_list)
 {
   for(int i=1; i<argCount(); i++)
     if(memcmp(getArg(i), "log:", 4) == 0)
@@ -132,8 +132,10 @@ void readInput()
               events[i].Event.KeyEvent.bKeyDown)
       {
         int key = events[i].Event.KeyEvent.uChar.AsciiChar;
-        if(events[i].Event.KeyEvent.wVirtualKeyCode == 37) key = K_LEFT;
-        if(events[i].Event.KeyEvent.wVirtualKeyCode == 39) key = K_RIGHT;
+        if(events[i].Event.KeyEvent.wVirtualKeyCode == VK_LEFT ) key = K_LEFT;
+        if(events[i].Event.KeyEvent.wVirtualKeyCode == VK_RIGHT) key = K_RIGHT;
+        if(events[i].Event.KeyEvent.wVirtualKeyCode == VK_UP   ) key = K_UP;
+        if(events[i].Event.KeyEvent.wVirtualKeyCode == VK_DOWN ) key = K_DOWN;
         if(key && (key_write_pos+1) % key_buffer_size != key_read_pos)
         {
           key_buffer[key_write_pos++] = key;

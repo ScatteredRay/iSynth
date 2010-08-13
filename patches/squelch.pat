@@ -4,9 +4,7 @@
 200 Input touch(2)
 
 #note
-200 Rescaler note(x, 24, 48)
-200 Quantize note_quant(note)
-200 NoteToFrequency freq(note_quant, "minor")
+200 XToFrequency freq(x)
 
 #noise
 Saw osc(freq)

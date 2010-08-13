@@ -4,14 +4,13 @@
 200 Input touch(2)
  
 #note
-200 Rescaler note(x, 48, 72)
-200 Quantize note_quant(note)
-200 NoteToFrequency freq(note_quant, "pentatonic")
+200 XToFrequency freq(x)
 
 #noise
 200 Rescaler mod_freqmult(y, 6, 8)
 200 Multiply mod_freq(freq, mod_freqmult)
-Sine mod_unit(mod_freq, touch)
+200 Clipper mod_freq_clipped(mod_freq, 0, 22050)
+Sine mod_unit(mod_freq_clipped, touch)
 Multiply mod(mod_unit, 0.2)
 Sine carrier(freq, touch, mod)
 
