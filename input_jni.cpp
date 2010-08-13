@@ -66,7 +66,7 @@ Java_com_iSynth_Audio_inputDown(JNIEnv *env, jobject obj, jboolean d)
 
 
 JNIEXPORT void JNICALL
-Java_com_iSynth_Audio_setArgs(JNIEnv *env, jobject obj, jobjectArray args) {
+Java_com_iSynth_iSynth_setArgs(JNIEnv *env, jobject obj, jobjectArray args) {
     argc = env->GetArrayLength(args);
     argv = new char*[argc];
     for (int i(0); i < argc; ++i) {

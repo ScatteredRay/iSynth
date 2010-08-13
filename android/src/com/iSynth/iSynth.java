@@ -11,9 +11,11 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+
 
 public class iSynth extends Activity {
     private XYView panel;
@@ -28,6 +30,8 @@ public class iSynth extends Activity {
         inp = new InputPosition();
         panel = new XYView(this, inp);
         setContentView(panel);
+        registerForContextMenu(panel);
+
         //setContentView(R.layout.main);
     }
 
@@ -67,13 +71,22 @@ public class iSynth extends Activity {
         AssetManager am = getAssets();
         try {
             String[] fns = am.list("patches");
+            String[] args = new String[fns.length+1];
+            args[0] = "iSynth";
+            
             String relpath;
             for (int i=0; i<fns.length; ++i) {
                 relpath = "patches/"+fns[i];
                 AssetFileDescriptor afd = am.openFd(relpath);
-                addFile(relpath.substring(0, relpath.length()-4), afd.getStartOffset(), afd.getLength());
+                relpath = relpath.substring(0, relpath.length()-4);
+                addFile(relpath, afd.getStartOffset(), afd.getLength());
                 afd.close();
+
+                args[i+1]=new String(relpath);
             }
+            
+            setArgs(args);
+            
             fns = am.list("samples");
             for (int i=0; i<fns.length; ++i) {
                 relpath = "samples/"+fns[i];
@@ -90,8 +103,38 @@ public class iSynth extends Activity {
 
     }
 
+
+    //this isn't getting called for some reason, so i've worked it
+    //into onKeyDown for now.
+    @Override
+    public void onBackPressed() {
+         inp.setNextPatch(-1);
+    }
+    
+    @Override
+    public boolean onSearchRequested() {
+        inp.setNextPatch(1);
+        return true;
+    }
+    
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent ev) {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            inp.setNextPatch(1);
+            return true;
+        }
+        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+            keyCode == KeyEvent.KEYCODE_BACK) {
+            inp.setNextPatch(-1);
+            return true;
+        }
+        return false;
+    }
+
     private native void setApkPath(String path);
     private native void addFile(String name, long pos, long len);
+    private native void setArgs(String[] args);
+
 
     static {
         System.loadLibrary("iSynth");
@@ -104,6 +147,8 @@ class InputPosition {
     private boolean down=false;
     private int w=600;
     private int h=600;
+    private int nextPatch=0;
+    
     public synchronized float getXScaled() {
         x = Math.max(0, Math.min(w, x));
         return x*2/w - 1;
@@ -128,6 +173,17 @@ class InputPosition {
         this.w = w;
         this.h = h;
     }
+    
+    public synchronized void setNextPatch(int d) {
+        this.nextPatch = d;
+    }
+    
+    public synchronized int getNextPatch() {
+        int tmp=nextPatch;
+        nextPatch=0;
+        return tmp;
+
+    }
 }
 
 class Audio extends Thread {
@@ -150,17 +206,13 @@ class Audio extends Thread {
                 AudioFormat.ENCODING_PCM_16BIT,
                 buf_size,
                 AudioTrack.MODE_STREAM);
-        String[] args = {"iSynth", "patches/retrigpulser.pat"};
-        //String[] args = {"iSynth", "patches/pad.pat"};
-
-        setArgs(args);
+ 
     }
 
     private native short[] produceStream(short[] buffer, int count);
     private native void inputXY(float X, float Y);
     private native void inputDown(boolean d);
-    private native void setArgs(String[] args);
-
+    private native void nextPatch(int d);
 
     public void run() {
         if (at.getState() != AudioTrack.STATE_INITIALIZED) {
@@ -169,6 +221,7 @@ class Audio extends Thread {
         }
         short[] buf = new short[buf_size];
         at.play();
+        int np;
         for (;;) {
             inputXY(inp.getXScaled(), inp.getYScaled());
             inputDown(inp.isDown());
@@ -178,6 +231,10 @@ class Audio extends Thread {
             if(interrupted()) {
                 at.stop();
                 return;
+            }
+            np = inp.getNextPatch();
+            if (np != 0) {
+                nextPatch(np);
             }
         }
     }
@@ -202,6 +259,10 @@ class XYView extends SurfaceView implements SurfaceHolder.Callback {
         inp.setDown(ev.getAction() != MotionEvent.ACTION_UP);
         return true;
     }
+
+ 
+ 
+    
 
     public void surfaceCreated(SurfaceHolder sh) {}
     public void surfaceDestroyed(SurfaceHolder sh) {}
