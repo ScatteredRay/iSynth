@@ -1,4 +1,4 @@
-#include "audio.h"
+#include "io.h"
 
 #include <dsound.h>
 #include <windows.h>
@@ -6,8 +6,8 @@
 #include <dxerr.h>
 
 #include "exception.h"
-#include "input.h"
 #include "synth.h"
+#include "ui.h"
 
 IDirectSoundBuffer *buffer;
 HANDLE notification_event;
@@ -41,8 +41,7 @@ void setupSound(unsigned int buffer_size)
     0,                    // "reserved"
     &wave_format,         // wave format descriptor
     DS3DALG_DEFAULT       // 3d virtualization algorithm
-  };
-  
+  };  
   
   if(FAILED(dsound->CreateSoundBuffer(&buffer_descriptor, &buffer, 0)))
     throw(DsoundExcept("couldn't create dsound buffer"));
@@ -88,10 +87,7 @@ void streamSound(unsigned int buffer_size)
   
   for(;;)
   {
-    char key = getKey();
-    if(key == K_ESCAPE) return;
-    if(key == K_RIGHT ) synthNextPatch(-1);
-    if(key == K_LEFT  ) synthNextPatch();
+    if(uiTick()) return;
     
     DWORD event = MsgWaitForMultipleObjects(1, &notification_event, false,
                                             INFINITE,  QS_ALLEVENTS);
@@ -108,11 +104,11 @@ void streamSound(unsigned int buffer_size)
       next_write_position %= (buffer_size*2);
 //      printf("nwp:%d, wws:%d, wwe:%d\n", next_write_position, write_window_start, write_window_end);
         
-      if(write_window_end < write_window_start) write_window_end +=
-        buffer_size*2;
+      if(write_window_end < write_window_start)
+        write_window_end += buffer_size*2;
       
-      if(next_write_position < write_window_start) next_write_position +=
-        buffer_size*2;
+      if(next_write_position < write_window_start)
+        next_write_position += buffer_size*2;
         
       if(next_write_position < write_window_end)
       {
@@ -126,14 +122,15 @@ void streamSound(unsigned int buffer_size)
                                write_buffers+1,       write_buffer_sizes+1, 0)))
           throw(DsoundExcept("couldn't lock dsound buffer"));
         
-//        printf("[%p, %d], [%p, %d]\n", write_buffers[0], write_buffer_sizes[0],
-//                                       write_buffers[1], write_buffer_sizes[1]);
+        static short unified_buffer[max_buffer_size*4];
+        synthProduceStream(unified_buffer,
+                           (write_buffer_sizes[0]+write_buffer_sizes[1])/4);
+        memcpy(write_buffers[0], unified_buffer, write_buffer_sizes[0]);
+        if(write_buffers[1])
+          memcpy(write_buffers[1],
+                 unified_buffer+write_buffer_sizes[0]/sizeof(short), 
+                 write_buffer_sizes[1]);
 
-        for(int i=0; i<2; i++)
-          if(write_buffers[i])
-            synthProduceStream((short *)(write_buffers[i]),
-                                         write_buffer_sizes[i]/4);
-   
         if(FAILED(buffer->Unlock(write_buffers[0], write_buffer_sizes[0], 
                                  write_buffers[1], write_buffer_sizes[1])))
           throw(DsoundExcept("couldn't unlock dsound buffer"));
@@ -153,8 +150,9 @@ void streamSound(unsigned int buffer_size)
   }
 }
 
-void makeNoise()
+void ioLoop()
 { 
+  uiInit();
   setupSound (1024);
   streamSound(1024);
 }

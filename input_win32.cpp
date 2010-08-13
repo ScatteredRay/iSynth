@@ -1,8 +1,16 @@
-#include "input.h"
-
 #include <cmath>
 #include <cstdio>
+#include <vector>
 #include <windows.h>
+#include <vector>
+
+#include "input.h"
+
+#pragma warning(disable:4996) // strncpy/strtok() purportedly unsafe
+
+using namespace std;
+
+using namespace std;
 
 static HANDLE console;
 static float input_x, input_y, input_button;
@@ -32,10 +40,10 @@ void initInput(int _argc, char **_argv)
   SetConsoleWindowInfo(GetStdHandle(STD_OUTPUT_HANDLE), true, &rect);;
   COORD origin = { 0, 0 };
   DWORD out;
-  FillConsoleOutputCharacter(GetStdHandle(STD_OUTPUT_HANDLE), '.', 80*50,
+  FillConsoleOutputCharacter(GetStdHandle(STD_OUTPUT_HANDLE), ' ', 80*50,
                              origin, &out);
   gotoXY(0, 0);
-  printf("Click to make noise, escape to quit.");
+  printf("Click to make noise, escape to quit. Arrow keys to change parameters.");
 }
 
 int argCount() { return argc; }
@@ -43,6 +51,26 @@ char *getArg(int n)
 {
   if(n >= 0 && n < argc) return argv[n];
   return 0;
+}
+
+void populatePatchList(vector<string>& patches)
+{
+  //char *patch_filename = "patches/pad.pat";
+  for(int i=1; i<argCount(); i++)
+      if(!strchr(getArg(i), ':')) patches.push_back(getArg(i));
+  if(patches.size() == 0) patches.push_back("patches/pad.pat");
+}
+
+void populateLogList(vector<string>& log_list)
+{
+  for(int i=1; i<argCount(); i++)
+    if(memcmp(getArg(i), "log:", 4) == 0)
+    {      
+      char loglist[256];
+      strncpy(loglist, getArg(i)+4, 255);
+      char *name = strtok(loglist, ",");
+      do log_list.push_back(name); while(name = strtok(0, ","));
+    }
 }
 
 void deinitInput()
@@ -104,8 +132,10 @@ void readInput()
               events[i].Event.KeyEvent.bKeyDown)
       {
         int key = events[i].Event.KeyEvent.uChar.AsciiChar;
-        if(events[i].Event.KeyEvent.wVirtualKeyCode == 37) key = K_LEFT;
-        if(events[i].Event.KeyEvent.wVirtualKeyCode == 39) key = K_RIGHT;
+        if(events[i].Event.KeyEvent.wVirtualKeyCode == VK_LEFT ) key = K_LEFT;
+        if(events[i].Event.KeyEvent.wVirtualKeyCode == VK_RIGHT) key = K_RIGHT;
+        if(events[i].Event.KeyEvent.wVirtualKeyCode == VK_UP   ) key = K_UP;
+        if(events[i].Event.KeyEvent.wVirtualKeyCode == VK_DOWN ) key = K_DOWN;
         if(key && (key_write_pos+1) % key_buffer_size != key_read_pos)
         {
           key_buffer[key_write_pos++] = key;
@@ -137,4 +167,12 @@ void readInputAxis(int axis, float *buffer, int size)
   if(value >  1) value =  1;
   
   for(int i=0; i<size; i++) buffer[i] = value;
+}
+
+double hires_time()
+{
+  LARGE_INTEGER c, f;
+  QueryPerformanceCounter  (&c);
+  QueryPerformanceFrequency(&f);
+  return double(c.QuadPart)/double(f.QuadPart);
 }

@@ -41,7 +41,7 @@ void inputXY(float X, float Y);
 // Implement viewDidLoad to do additional setup after loading the view, typically from a nib.
 - (void)viewDidLoad {
     [super viewDidLoad];
-	initInput();
+	initInput(0, NULL);
 	setupSound();
 	beginStreamSound();
 }

@@ -20,7 +20,6 @@
    - switch
    - DADSR, parameterized shape
    - wave terrain
-   - use yacc to parse modules?
    - support for arbitrary parameter count
      + sequencer (retriggerable)
    - additional filters?  eq?
@@ -59,10 +58,12 @@
 */
 #include "synth.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <sstream>
 #include <map>
@@ -70,8 +71,8 @@
 #include <utility>
 #include <vector>
 
+#include "io.h"
 #include "exception.h"
-#include "file.h"
 #include "input.h"
 
 using namespace std;
@@ -89,13 +90,15 @@ using namespace std;
 const float pi = 3.1415926535897932384626f, e = 2.71828183f;
 const float note_0 = 8.1757989156;
 const float middle_c = 261.625565;
-const int max_buffer_size = 4000;
-const int sample_rate = 44100;
+const int g_sample_rate = 44100;
 
-struct
-{ const char *name;
-  const char *steps;
-} scales[] =
+char *g_keys[] =
+{
+  "C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb",
+  "B"
+};
+
+scale g_scales[] =
 {
   { "major",      "\2\2\1\2\2\2\1" },
   { "minor",      "\2\1\2\2\1\2\2" },
@@ -117,6 +120,12 @@ struct
   { 0,            0 }
 };
 
+int g_key = 0;
+char g_closest_notes[128];
+FileRef g_patch("pad.pat");
+int g_octave_range = 2;
+int g_start_octave = 4;
+
 EXCEPTION_D(UnhandledWaveFormatException, Exception,
             "Can only handle 16-bit PCM .wav files")
 static unsigned char wave_header[] =
@@ -137,7 +146,7 @@ static unsigned char wave_header[] =
 class WaveIn
 {
   public:
-    WaveIn(const string filename)
+    WaveIn(const FileRef filename)
     {
       File in(filename, File::READ);
       static unsigned char header[sizeof(wave_header)];
@@ -182,7 +191,8 @@ class WaveIn
 class WaveOut
 {
   public:
-    WaveOut(const string filename, float scaler=32768, bool stereo=false)
+    WaveOut(const string filename, int sample_rate, float scaler=32768,
+            bool stereo=false)
     : m_scaler(scaler), m_length(0), m_out(filename, File::WRITE)
     {
       if(stereo) wave_header[22] = 0x02, wave_header[32] = 0x04;
@@ -227,13 +237,74 @@ class WaveOut
     int   m_length;
 };
 
+EXCEPTION(MismatchedProfilePop, Exception, "MismatchedProfilePop")
+
+bool sortby(const pair<double, string> &a, const pair<double, string> &b)
+{
+  return a.first > b.first;
+}
+
+class Profiler
+{
+  public:
+    char *describeTimeSpent(double audio_time)
+    {
+      static char buf[4096];
+      buf[0] = 0;
+      
+      vector<pair<double, string> > mlist;
+        
+      for(map<string, double>::iterator i=m_time_spent.begin();
+          i!=m_time_spent.end(); i++)
+        mlist.push_back(pair<double, string>(i->second, i->first));
+
+      sort(mlist.begin(), mlist.end(), sortby);
+
+      double total_time = 0;
+      for(vector<pair<double, string> >::iterator i = mlist.begin();
+          i!=mlist.end(); i++)
+        total_time += i->first;
+
+      for(vector<pair<double, string> >::iterator i = mlist.begin();
+          i!=mlist.end(); i++)
+        sprintf(buf+strlen(buf), "%g (%2.2f%%) %s\n", i->first,
+                i->first/total_time*100, i->second.c_str());
+      sprintf(buf+strlen(buf), "total: %.2fs CPU / %.2fs audio (%g%%)",
+              total_time, audio_time, total_time*100/audio_time);
+      return buf;
+    }
+    
+    void clear()
+    {
+      m_time_spent.clear();
+    }
+    
+    void addTime(string name, double time)
+    {
+      if(m_time_spent.count(name) == 0) m_time_spent[name] = time;
+      else m_time_spent[name] += time;
+    }
+  
+    map<string, double> m_time_spent;
+};
+
+Profiler g_profiler;
+
 EXCEPTION_D(InvalidInputRangeExcept,  Exception, "Invalid Input Range")
 EXCEPTION_D(InvalidOutputRangeExcept, Exception, "Invalid Output Range")
+
+inline float interpolate(float a, float b, float frac)
+{
+  return b*frac + a*(1.0-frac);
+}
+
+        // sample rate, <buffer,  previous sample>
+typedef map<int,    pair<float *, float> > ResampleBufferMap;
 
 class Module
 {
   public:
-    Module() : m_last_fill(0), m_waveout(0)
+    Module() : m_last_fill(0), m_waveout(0), m_sample_rate(g_sample_rate)
     {
       memset(m_output, 0, max_buffer_size*sizeof(float));
       //memset(&m_within_lower_bound, 0xff, sizeof(float));
@@ -242,28 +313,92 @@ class Module
     ~Module()
     {
       if(m_waveout) delete m_waveout;
+      for(ResampleBufferMap::iterator i = m_converted_outputs.begin();
+          i != m_converted_outputs.end(); i++)
+        delete[] i->second.first; // free buffer
     }
+    
+    void setName(string name) { m_name = name; }
+    void setSampleRate(int sample_rate) { m_sample_rate = sample_rate; }
 
     virtual void fill(float last_fill, int samples) = 0;
     virtual void getOutputRange(float *out_min, float *out_max) = 0;
     virtual const char *moduleName() = 0;
     virtual void validateInputRange() = 0;
-    virtual bool stereo() const { return false; }
+    virtual bool stereo() const { return false; }    
 
-    virtual const float *output(float last_fill, int samples)
+    virtual void convertToRate(int output_rate, int samples)
+    {      
+      double start_time = hires_time();
+      
+      int from = max(1.0f, float(samples)*m_sample_rate/g_sample_rate);
+      int to   = max(1.0f, float(samples)*  output_rate/g_sample_rate);
+      float *buf      = m_converted_outputs[output_rate].first;
+      float  position = m_converted_outputs[output_rate].second;
+      if(m_last_fill == 0) position = m_output[0];
+      
+      if(from==1) for(int i=0; i<to; i++) *buf++ = *m_output;        
+      else if(to < from) // downsample
+      {
+        float delta = float(from)/to;
+        float pos   = 0.0;
+        for(int i=0; i<to; i++)
+        {
+          *buf++ = m_output[int(pos)];
+          pos += delta;   
+        }
+      }
+      else // upsample
+      {
+        int per = to/from;
+        int segments = from;
+
+        for(int i=0; i<from; i++)
+        {
+          if(i+1 == from) per += to - per*from;
+          float delta = (m_output[i] - position) / per;
+          for(int j=0; j<per-1; j++)
+          {
+            *buf++ = position;
+            position += delta;
+          }
+          position = m_output[i];
+          *buf++ = position;
+        }
+      }
+      m_converted_outputs[output_rate].second = position;
+      
+      g_profiler.addTime("Resampling", hires_time() - start_time);
+    }
+
+    virtual const float *output(float last_fill, int samples, int output_rate)
     {
       if(m_last_fill < last_fill)
       {
         validateInputRange();
         fill(last_fill, samples);
-        m_last_fill = last_fill;
-        if(m_waveout) m_waveout->writeBuffer(m_output, samples);
+        int sample_count = max(1.0f, samples*m_sample_rate/g_sample_rate);
+        if(m_waveout) m_waveout->writeBuffer(m_output, sample_count);
         #ifndef NDEBUG
-        validateOutputRange(m_output, samples);
+        validateOutputRange(m_output, sample_count);
         #endif
+        
+        for(ResampleBufferMap::iterator i = m_converted_outputs.begin();
+            i != m_converted_outputs.end(); i++)
+          convertToRate(i->first, samples);
       }
-
-      return m_output;
+      
+      if(output_rate != m_sample_rate && m_converted_outputs.count(output_rate) == 0)
+      {
+        m_converted_outputs[output_rate] =
+          pair<float *, float>(new float[max_buffer_size], 0);
+        convertToRate(output_rate, samples);
+      }
+      
+      m_last_fill = last_fill;
+      
+      if(output_rate == m_sample_rate) return m_output;
+      return m_converted_outputs[output_rate].first;
     }
 
     virtual void createLog(const string filename)
@@ -275,7 +410,8 @@ class Module
       fn << filename << " (" << min << " to " << max << ").wav";
 
       if(-min > max) max = -min;
-      if(!m_waveout) m_waveout = new WaveOut(fn.str(), 32767/max);
+      if(!m_waveout)
+        m_waveout = new WaveOut(fn.str(), m_sample_rate, 32767/max);
     }
 
     void validateWithin(Module &input, float min, float max)
@@ -298,7 +434,7 @@ class Module
       getOutputRange(&min, &max);
       for(int i=0; i<samples; i++)
       {
-        if(buffer[i] < min || m_output[i] > max)
+        if(buffer[i] < min || buffer[i] > max)
         {
           static char error[256];
           getOutputRange(&min, &max);
@@ -315,7 +451,10 @@ class Module
 
   protected:
     float m_output[max_buffer_size];
+    ResampleBufferMap m_converted_outputs;
     float m_last_fill;
+    float m_sample_rate;
+    string m_name;
     //float m_within_lower_bound;
     //float m_within_upper_bound;
     WaveOut *m_waveout;
@@ -331,8 +470,9 @@ class StereoModule : public Module
 
     bool stereo() const { return true; }
 
-    const float *output(float last_fill, int samples)
+    const float *output(float last_fill, int samples, int at_rate)
     {
+      if(at_rate != g_sample_rate) throw "Ugh";
       if(m_last_fill < last_fill)
       {
         fill(last_fill, samples);
@@ -351,7 +491,8 @@ class StereoModule : public Module
       ostringstream fn;
       fn << filename << " (" << min << " to " << max << ").wav";
       if(-min > max) max = -min;
-      if(!m_waveout) m_waveout = new WaveOut(fn.str(), 32767/max, true);
+      if(!m_waveout)
+        m_waveout = new WaveOut(fn.str(), m_sample_rate, 32767/max, true);
     }
 
   protected:
@@ -403,7 +544,9 @@ class Input : public Module
 
     void fill(float last_fill, int samples)
     {
+      //double start = hires_time();      
       readInputAxis(m_axis, m_output, samples);
+      //g_profiler.addTime("Input", hires_time() - start);
     }
   
     void getOutputRange(float *out_min, float *out_max)
@@ -416,6 +559,35 @@ class Input : public Module
 
   private:
     int m_axis;
+};
+
+class Curve
+{
+  public:
+    Curve() : m_coefficient(0), m_start(0), m_end(0), m_level(0) {}
+    
+    void start(float start, float end, float time, int sample_rate)
+    {
+      m_start       = start;
+      m_end         = end;
+      m_level       = 1.0f;
+      m_coefficient = (log(0.00001f)-log(1.0f)) / (time*sample_rate);
+    }
+    
+    void step()
+    {
+      m_level += m_coefficient*m_level;
+      if(m_level < 0.00001f) m_level = 0.0;
+    }
+    
+    float position() const { return (m_start-m_end) * m_level + m_end; }
+    
+    bool finished() const { return m_level < 0.00001f; }
+
+  private:
+    float m_level;
+    float m_coefficient;
+    float m_start, m_end;  
 };
 
 EXCEPTION(ParseExcept, Exception, "Parse Error")
@@ -480,6 +652,12 @@ float onepoleCoefficient(float time)
          (360481000.0*pow(time, 1.1f) + 100000);
 }
 
+inline float freqFromX(float x)
+{
+  int note = (x+1)/2*g_octave_range*12+g_start_octave*12;
+  return pow(2.0, (g_closest_notes[note]+g_key)/12.0) * note_0;
+}
+
 map<string, ModuleInfo *> g_module_infos;
 
 EXCEPTION_D(ModuleExcept, Exception, "Module exception")
@@ -514,11 +692,18 @@ void addModule(char *definition)
   if(!t) return;
   
   string name = "", type = "";
+  int at_rate = 44100;
+  
   vector<ModuleParam *> params;
   do
   {
     if(type == "")
     {
+      if(isdigit(*t))
+      {
+        at_rate = atoi(t);
+        continue;
+      }
       type = t;
       if(g_module_infos.count(type) == 0)
         throw(UnknownModuleTypeExcept(def_copy+t));
@@ -596,22 +781,25 @@ void addModule(char *definition)
     throw(TooFewParamsExcept(def_copy));
   if(g_modules.count(name) > 0) throw(ReusedModuleNameExcept(def_copy+name));
   g_modules[name] = g_module_infos[type]->instantiate(params);
+  g_modules[name]->setName(name);
+  g_modules[name]->setSampleRate(at_rate);
 }
 
 EXCEPTION  (NoOutputModuleExcept,  Exception, "No output module")
 EXCEPTION  (OutputNotStereoExcept, Exception, "Output not stereo")
 EXCEPTION_D(CouldntOpenFileExcept, Exception, "Couldn't open file")
 
-static vector<string> g_patches;
-static int g_patch_position = 0;
-static vector<string> g_log_list;
+static vector<FileRef> g_log_list;
 static Module *g_stream_output;
+float g_audio_time = 0;
 
-Module *loadPatch(const string &filename)
+Module *loadPatch(const FileRef &filename)
 {
   g_modules.clear();
-
-  File in(filename, File::READ);
+  g_profiler.clear();
+  g_audio_time = 0;
+  
+  File in(string("patches/") + filename, File::READ);
 
   string s;
   while(!in.eof())
@@ -638,14 +826,47 @@ Module *loadPatch(const string &filename)
   return output;
 }
 
-void synthNextPatch(int offset)
+void synthSetRange(int start_octave, int octave_range)
 {
-  if(g_patches.size() == 0) return;
-  
-  g_patch_position += offset;
-  if(g_patch_position < 0) g_patch_position = g_patches.size()-1;
-  if(g_patch_position >= g_patches.size()) g_patch_position = 0;
-  g_stream_output = loadPatch(g_patches[g_patch_position]);
+  g_octave_range = octave_range;
+  g_start_octave = start_octave;
+}
+
+void synthSetPatch(const FileRef &patch)
+{
+  g_patch = patch;
+  g_stream_output = loadPatch(patch);  
+}
+
+void synthSetKey(int key)
+{
+  g_key = key;
+}
+
+void synthSetScale(const char *name)
+{
+  char *steps;
+  for(int i=0; g_scales[i].name; i++)
+    if(strcmp(name, g_scales[i].name) == 0)
+      steps = (char *)(g_scales[i].steps);
+  if(steps == 0)
+    throw(ModuleExcept(string("Unknown scale: ")+name));
+  for(int note=0; note<128; note++)
+  {
+    int closest = -128;
+    int step = 0;
+    for(int trying=0; trying<128; trying+=steps[step])
+    {
+      if(steps[++step] == 0) step = 0;
+      if(abs(trying-note) < abs(closest-note)) closest = trying;
+    }
+    g_closest_notes[note] = closest;
+  }
+}
+
+char *describeTimeSpent()
+{
+  return g_profiler.describeTimeSpent(g_audio_time);
 }
 
 Module *setupStream()
@@ -653,44 +874,30 @@ Module *setupStream()
   fillModuleList();
   g_module_infos["Input"] = new ModuleInfo("Input", Input::create);
   g_module_infos["Input"]->addParameter("axis", "int");
+  
+  populateLogList(g_log_list);
 
-  //char *patch_filename = "patches/pad.pat";
-  for(int i=1; i<argCount(); i++)
-    if(!strchr(getArg(i), ':')) g_patches.push_back(getArg(i));
-  if(g_patches.size() == 0) g_patches.push_back("patches/pad.pat");
-
-  for(int i=1; i<argCount(); i++)
-    if(memcmp(getArg(i), "log:", 4) == 0)
-    {      
-      char loglist[256];
-      strncpy(loglist, getArg(i)+4, 255);
-      char *name = strtok(loglist, ",");
-      do g_log_list.push_back(name); while(name = strtok(0, ","));
-    }
-
-  return loadPatch(g_patches[0]);
+  return loadPatch(g_patch);
 }
 
 void synthProduceStream(short *buffer, int samples)
 { 
-  static bool first = true;
-  if(first)
-  {
-    first = false;
+  if(!g_stream_output)
     g_stream_output = setupStream();
-  }
   
-  static float time = 0;
-  const float *o = g_stream_output->output(time, samples);
-  time += 1.0;
+  double time = hires_time();  
+  const float *o = g_stream_output->output(g_audio_time, samples, g_sample_rate);
+  g_audio_time += float(samples) / g_sample_rate;  
   
   for(int i=0; i<samples*2; i+=2)
   {
 #ifdef __APPLE__
     *buffer++ = short(o[i]+o[i+1] * 16384);
+#elif __CHUMBY__
+	*buffer++ = ((long)o[i]*32767) | ((long)(o[i+1]*32767)<<16);
 #else
-    *buffer++ = short(o[i]   * 32767);
-    *buffer++ = short(o[i+1] * 32767);
+  *buffer++ = short(o[i]   * 32767);
+  *buffer++ = short(o[i+1] * 32767);
 #endif
   }
 }

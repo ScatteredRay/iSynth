@@ -32,6 +32,9 @@ EXCEPTION_D(ExceptionNotInWriteMode,  Exception, "File not in write mode: ")
 /* Thrown when unable to open requested file. */
 EXCEPTION_D(ExceptionCouldntOpenFile, Exception, "Couldn't open file: ")
 
+// This should be an opaque type, but fine for now.
+typedef std::string FileRef;
+
 class FileHandle;
 
 /// @brief Provides file I/O
@@ -44,7 +47,7 @@ class File
     /// @brief Construct with a file open.
     /** @param filename Name of file to open.
         @param mode Mode in which to open the file. */
-    File(const std::string &filename, int8 mode)
+    File(const FileRef &filename, int8 mode)
     : m_file(0), m_cached_size(-1), m_mode(0)
     { 
       if(!open(filename, mode)) throw(ExceptionCouldntOpenFile(filename));
@@ -56,7 +59,7 @@ class File
     /// @brief Open a file.
     /** @param filename Name of file to open.
         @param m Mode in which to open the file. */     
-    bool open(const std::string &filename, int8 mode);
+    bool open(const FileRef &filename, int8 mode);
 
     /// @brief Close open file, if any.
     void close();

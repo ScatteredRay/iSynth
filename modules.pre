@@ -3,9 +3,9 @@
     float position = 0, last_trigger = 0
   fill:
     *output++ = (m_position-0.5f)*2;
-    m_position += frequency[i] / sample_rate;
+    m_position += frequency[i] / m_sample_rate;
     m_position -= int(m_position);
-    if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+    if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
       m_position = 0;
     m_last_trigger = retrigger[i];
   output_range:
@@ -20,9 +20,9 @@
     float position = 0, last_trigger = 0
   fill:
     *output++ = (m_position > pulsewidth[i]) ? -1.0f:1.0f;
-    m_position += frequency[i] / sample_rate;
+    m_position += frequency[i] / m_sample_rate;
     m_position -= int(m_position);
-    if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+    if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
       m_position = 0;
     m_last_trigger = retrigger[i];
   output_range:
@@ -37,9 +37,9 @@
     float position = 0, last_trigger = 0
   fill:
     *output++ = sin((m_position+phase_offset[i])*2*pi);
-    m_position += frequency[i] / sample_rate;
+    m_position += frequency[i] / m_sample_rate;
     m_position -= int(m_position);
-    if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+    if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
       m_position = 0;
     m_last_trigger = retrigger[i];
   output_range:
@@ -55,9 +55,9 @@
   fill:
     if(m_position < .5f) *output++ = (m_position-0.25f) *  4;
     else                 *output++ = (m_position-0.75f) * -4;
-    m_position += frequency[i] / sample_rate;
+    m_position += frequency[i] / m_sample_rate;
     m_position -= int(m_position);
-    if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+    if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
       m_position = 0;
     m_last_trigger = retrigger[i];
   output_range:
@@ -83,25 +83,29 @@
     *out_max = 1;
 @
 
-@module Sample(string sample_name, frequency, retrigger=0, loop_start=0, loop_end=1):
+@module Sample(string sample_name, frequency, trigger=0, loop_start=0, loop_end=1):
   members:
     float   position         = 0
     WaveIn* sample           = 0
     float   rate_coefficient = 0
-    float   last_trigger     = 0
+    float   last_trigger     = -1
   initialize:
     m_sample = new WaveIn(m_sample_name);
-    m_rate_coefficient = m_sample->nativeSampleRate() / middle_c /
-                         m_sample->length() / sample_rate;
+    m_rate_coefficient = 0;
   misc:
     ~Sample() { delete m_sample; }
   fill:
     *output++ = m_sample->valueAt(m_position);
-    m_position += frequency[i] * m_rate_coefficient;
     
-    if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+    if(m_last_trigger < 0.9 && trigger[i] >= 0.9)
+    {
       m_position = 0;
-    m_last_trigger = retrigger[i];
+      m_rate_coefficient = m_sample->nativeSampleRate() / middle_c /
+                           m_sample->length() / m_sample_rate;
+    }
+    m_last_trigger = trigger[i];
+
+    m_position += frequency[i] * m_rate_coefficient;
 
     if(m_position > loop_end[i])
     {
@@ -113,7 +117,7 @@
     *out_max =  1;
   input_range:
     frequency: 0, 22050
-    retrigger: 0, 1
+    trigger: 0, 1
     loop_start: 0, 1
     loop_end: 0, 1
 @
@@ -178,7 +182,7 @@
   misc:
     inline void recalculateFilter(float cutoff, float resonance)
     {
-      m_f = 2.0f * cutoff / sample_rate;
+      m_f = 2.0f * cutoff / m_sample_rate;
       m_k = 3.6f*m_f - 1.6f*m_f*m_f -1.0f;
       m_p = (m_k+1.0f)*0.5f;
       m_scale = pow(e, (1.0f-m_p)*1.386249f);
@@ -219,6 +223,60 @@
 @
 
 @module EnvelopeGenerator(gate, float att, float dec, float sus, float rel):
+  members:
+    bool  held  = false
+    int   stage = 0
+  misc:
+    Curve m_curve;
+    enum { IDLE = 0, ATTACK, DECAY, SUSTAIN, RELEASE };
+  output_range:
+    *out_min = 0;
+    *out_max = 1;
+  input_range:
+    gate: -1, 1
+  fill:
+    if(!m_held)
+    {
+      if(gate[i] > 0.9)
+      {
+        m_stage = ATTACK;
+        m_curve.start(m_curve.position(), 1, m_att, m_sample_rate);
+        m_held = true;
+      }
+    }
+    else
+    {
+      if(gate[i] < 0.1)
+      {
+        m_stage = RELEASE;
+        m_curve.start(m_curve.position(), 0.001, m_rel, m_sample_rate);
+        m_held = false;
+      }
+    }
+    
+    m_curve.step();
+    
+    switch(m_stage)
+    {
+      case ATTACK:
+        if(m_curve.finished())
+        {
+          m_stage = DECAY;
+          m_curve.start(m_curve.position(), m_sus, m_dec, m_sample_rate);
+        }
+        break;
+      case RELEASE:
+        if(m_curve.finished())
+        {
+          m_stage = IDLE;
+          m_curve.start(0, 0, 1, m_sample_rate);
+        }
+        break;
+    }
+    
+    *output++ = m_curve.position();
+@
+/*module EnvelopeGenerator(gate, float att, float dec, float sus, float rel):
   members:
     float position = 0, coefficient = 0, destination = 0
     bool  held     = false
@@ -276,7 +334,7 @@
     }
             
     *output++ = m_position;
-@
+*/
 
 @module SampleAndHold(source, trigger):
   members:
@@ -288,7 +346,7 @@
   input_range:
     trigger: -1, 1
   fill:
-    if(m_last_trigger < 0.1 && trigger[i] > 0.9)
+    if(m_last_trigger < 0.9 && trigger[i] >= 0.9)
       m_value = source[i];
     m_last_trigger = trigger[i];
     *output++ = m_value;
@@ -370,41 +428,14 @@
     m_input->getOutputRange(out_min, out_max);
 @
 
-@module NoteToFrequency(input, string scale_name):
-  members:
-    char* scale=0
-    char* closest_notes = new char[128]
-  initialize:
-    for(int i=0; scales[i].name; i++)
-      if(m_scale_name == scales[i].name)
-        m_scale = (char *)(scales[i].steps);
-    if(m_scale == 0)
-      throw(ModuleExcept(string("Unknown scale: ")+m_scale_name));
-    for(int note=0; note<128; note++)
-    {
-      int closest = -128;
-      int step = 0;
-      for(int trying=0; trying<128; trying+=m_scale[step])
-      {
-        if(m_scale[++step] == 0) step = 0;
-        if(abs(trying-note) < abs(closest-note)) closest = trying;
-      }
-      m_closest_notes[note] = closest;
-    }
-  misc:
-    ~NoteToFrequency() { delete[] m_closest_notes; }
-    float freqFromNote(float note)
-    {
-      return pow(2.0, m_closest_notes[int(note)]/12.0) * note_0;
-    }
+@module XToFrequency(input):
   output_range:
-    float min, max;
-    m_input->getOutputRange(&min, &max);
-    *out_min = freqFromNote(min), *out_max = freqFromNote(max);
+    *out_min = 0;
+    *out_max = 4200;
   input_range:
-    input: 0, 127
+    input: -1, 1
   fill:
-    *output++ = freqFromNote(input[i]);
+    *output++ = freqFromX(input[i]);
 @
 
 @module MixDown(StereoModule input):
@@ -441,7 +472,7 @@
 
 @stereomodule PingPongDelay(float len, float filter, input, wet, dry, feedback):
   members:
-    int length = int(m_len*sample_rate)
+    int length = int(m_len*m_sample_rate)
     float* buffer_left  = new float[m_length] 
     float* buffer_right = new float[m_length]
     int read_pos = 1
@@ -549,8 +580,8 @@ class Delay : public Module
   public: 
     Delay(float length, float filter, Module &input, Module &wet, Module &dry,
           Module &feedback, Module &speed)
-    : m_buffer(new float[int(length*sample_rate)]),
-      m_length(int(length*sample_rate)),
+    : m_buffer(new float[int(length*m_sample_rate)]),
+      m_length(int(length*m_sample_rate)),
       m_read_pos(1), m_write_pos(0), m_last_sample(0), m_filter(filter),
       m_input(input), m_wet(wet), m_dry(dry), m_feedback(feedback),
       m_speed(speed)

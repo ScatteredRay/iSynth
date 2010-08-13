@@ -8,7 +8,7 @@
 
 #include <math.h>
 
-void produceStream(short *buffer, int samples);
+void synthProduceStream(short *buffer, int samples);
 
 AudioUnit gOutputUnit;
 UInt32 FinishedFrames;
@@ -20,7 +20,7 @@ OSStatus AudRenderCallback(void* inRefCon,
                         UInt32 inNumberFrames,
                         AudioBufferList* ioData)
 {
-    produceStream((short*)ioData->mBuffers[0].mData, inNumberFrames);
+    synthProduceStream((short*)ioData->mBuffers[0].mData, inNumberFrames);
 
     FinishedFrames += inNumberFrames;
     

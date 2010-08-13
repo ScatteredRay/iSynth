@@ -49,13 +49,16 @@ class %s : public %sModule
       float *output = m_output;"""
     for p in _.parameters:
       if p[1].endswith("Module"):
-        print "      const float *%s = m_%s->output(last_fill, samples);" % \
-              (p[0], p[0])
+        print "      const float *%s = m_%s->output" % (p[0], p[0]) + \
+              "(last_fill, samples, m_sample_rate);" 
     print """
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
 %s      }
-    }""" % (_.fill)
+      g_profiler.addTime("%s", hires_time()-time);
+    }""" % (_.fill, _.name)
     
     print """
     void getOutputRange(float *out_min, float *out_max)

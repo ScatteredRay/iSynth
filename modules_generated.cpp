@@ -22,18 +22,21 @@ class Saw : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-      const float *retrigger = m_retrigger->output(last_fill, samples);
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *retrigger = m_retrigger->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = (m_position-0.5f)*2;
-        m_position += frequency[i] / sample_rate;
+        m_position += frequency[i] / m_sample_rate;
         m_position -= int(m_position);
-        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
           m_position = 0;
         m_last_trigger = retrigger[i];
       }
+      g_profiler.addTime("Saw", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -77,19 +80,22 @@ class Pulse : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-      const float *pulsewidth = m_pulsewidth->output(last_fill, samples);
-      const float *retrigger = m_retrigger->output(last_fill, samples);
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *pulsewidth = m_pulsewidth->output(last_fill, samples, m_sample_rate);
+      const float *retrigger = m_retrigger->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = (m_position > pulsewidth[i]) ? -1.0f:1.0f;
-        m_position += frequency[i] / sample_rate;
+        m_position += frequency[i] / m_sample_rate;
         m_position -= int(m_position);
-        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
           m_position = 0;
         m_last_trigger = retrigger[i];
       }
+      g_profiler.addTime("Pulse", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -134,19 +140,22 @@ class Sine : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-      const float *retrigger = m_retrigger->output(last_fill, samples);
-      const float *phase_offset = m_phase_offset->output(last_fill, samples);
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *retrigger = m_retrigger->output(last_fill, samples, m_sample_rate);
+      const float *phase_offset = m_phase_offset->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = sin((m_position+phase_offset[i])*2*pi);
-        m_position += frequency[i] / sample_rate;
+        m_position += frequency[i] / m_sample_rate;
         m_position -= int(m_position);
-        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
           m_position = 0;
         m_last_trigger = retrigger[i];
       }
+      g_profiler.addTime("Sine", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -190,19 +199,22 @@ class Triangle : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-      const float *retrigger = m_retrigger->output(last_fill, samples);
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *retrigger = m_retrigger->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         if(m_position < .5f) *output++ = (m_position-0.25f) *  4;
         else                 *output++ = (m_position-0.75f) * -4;
-        m_position += frequency[i] / sample_rate;
+        m_position += frequency[i] / m_sample_rate;
         m_position -= int(m_position);
-        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
           m_position = 0;
         m_last_trigger = retrigger[i];
       }
+      g_profiler.addTime("Triangle", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -242,10 +254,13 @@ class Noise : public Module
     {
       float *output = m_output;
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = 2.0f*rand()/RAND_MAX - 1.0;
       }
+      g_profiler.addTime("Noise", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -282,12 +297,15 @@ class Within : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = (input[i]>=m_min && input[i]<=m_max) ? 1 : 0;
       }
+      g_profiler.addTime("Within", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -313,16 +331,15 @@ class Sample : public Module
     {
       m_sample_name = parameters[0]->m_string;
       m_frequency = parameters[1]->m_module;
-      m_retrigger = parameters[2]->m_module;
+      m_trigger = parameters[2]->m_module;
       m_loop_start = parameters[3]->m_module;
       m_loop_end = parameters[4]->m_module;
       m_position = 0;
       m_sample = 0;
       m_rate_coefficient = 0;
-      m_last_trigger = 0;
+      m_last_trigger = -1;
       m_sample = new WaveIn(m_sample_name);
-      m_rate_coefficient = m_sample->nativeSampleRate() / middle_c /
-                           m_sample->length() / sample_rate;
+      m_rate_coefficient = 0;
 
     }
     static Module *create(vector<ModuleParam *> parameters)
@@ -337,24 +354,31 @@ class Sample : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *frequency = m_frequency->output(last_fill, samples);
-      const float *retrigger = m_retrigger->output(last_fill, samples);
-      const float *loop_start = m_loop_start->output(last_fill, samples);
-      const float *loop_end = m_loop_end->output(last_fill, samples);
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *trigger = m_trigger->output(last_fill, samples, m_sample_rate);
+      const float *loop_start = m_loop_start->output(last_fill, samples, m_sample_rate);
+      const float *loop_end = m_loop_end->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = m_sample->valueAt(m_position);
-        m_position += frequency[i] * m_rate_coefficient;
-        if(m_last_trigger < 0.1 && retrigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && trigger[i] >= 0.9)
+        {
           m_position = 0;
-        m_last_trigger = retrigger[i];
+          m_rate_coefficient = m_sample->nativeSampleRate() / middle_c /
+                               m_sample->length() / m_sample_rate;
+        }
+        m_last_trigger = trigger[i];
+        m_position += frequency[i] * m_rate_coefficient;
         if(m_position > loop_end[i])
         {
           m_position -= (loop_end[i] - loop_start[i]);
           if(m_position > loop_end[i]) m_position = loop_end[i];
         }
       }
+      g_profiler.addTime("Sample", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -366,14 +390,14 @@ class Sample : public Module
     void validateInputRange()
     {
       validateWithin(*m_frequency, 0, 22050);
-      validateWithin(*m_retrigger, 0, 1);
+      validateWithin(*m_trigger, 0, 1);
       validateWithin(*m_loop_start, 0, 1);
       validateWithin(*m_loop_end, 0, 1);
     }
   private:
     string m_sample_name;
     Module *m_frequency;
-    Module *m_retrigger;
+    Module *m_trigger;
     Module *m_loop_start;
     Module *m_loop_end;
     float m_position;
@@ -411,12 +435,15 @@ class Rescaler : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = (input[i]-m_from_min) / m_from_range * m_to_range + m_to_min;
       }
+      g_profiler.addTime("Rescaler", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -472,7 +499,7 @@ class Filter : public Module
     const char *moduleName() { return "Filter"; }
     inline void recalculateFilter(float cutoff, float resonance)
     {
-      m_f = 2.0f * cutoff / sample_rate;
+      m_f = 2.0f * cutoff / m_sample_rate;
       m_k = 3.6f*m_f - 1.6f*m_f*m_f -1.0f;
       m_p = (m_k+1.0f)*0.5f;
       m_scale = pow(e, (1.0f-m_p)*1.386249f);
@@ -483,11 +510,13 @@ class Filter : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *cutoff = m_cutoff->output(last_fill, samples);
-      const float *resonance = m_resonance->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *cutoff = m_cutoff->output(last_fill, samples, m_sample_rate);
+      const float *resonance = m_resonance->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         if(m_oldcutoff != cutoff[i] || m_oldresonance != resonance[i])
         {
@@ -510,6 +539,7 @@ class Filter : public Module
         m_oldy3 = m_y3;
         *output++ = m_y4;
       }
+      g_profiler.addTime("Filter", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -564,13 +594,16 @@ class Multiply : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *a = m_a->output(last_fill, samples);
-      const float *b = m_b->output(last_fill, samples);
+      const float *a = m_a->output(last_fill, samples, m_sample_rate);
+      const float *b = m_b->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = a[i]*b[i];
       }
+      g_profiler.addTime("Multiply", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -612,13 +645,16 @@ class Add : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *a = m_a->output(last_fill, samples);
-      const float *b = m_b->output(last_fill, samples);
+      const float *a = m_a->output(last_fill, samples, m_sample_rate);
+      const float *b = m_b->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = a[i] + b[i];
       }
+      g_profiler.addTime("Add", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -658,12 +694,15 @@ class Quantize : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = floor(input[i]+0.5);
       }
+      g_profiler.addTime("Quantize", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -691,9 +730,6 @@ class EnvelopeGenerator : public Module
       m_dec = parameters[2]->m_float;
       m_sus = parameters[3]->m_float;
       m_rel = parameters[4]->m_float;
-      m_position = 0;
-      m_coefficient = 0;
-      m_destination = 0;
       m_held = false;
       m_stage = 0;
 
@@ -704,59 +740,58 @@ class EnvelopeGenerator : public Module
     }
 
     const char *moduleName() { return "EnvelopeGenerator"; }
+    Curve m_curve;
     enum { IDLE = 0, ATTACK, DECAY, SUSTAIN, RELEASE };
 
     
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *gate = m_gate->output(last_fill, samples);
+      const float *gate = m_gate->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         if(!m_held)
         {
           if(gate[i] > 0.9)
           {
-            m_stage       = ATTACK;
-            m_coefficient = onepoleCoefficient(m_att);
-            m_destination = 1;
-            m_held        = true;
+            m_stage = ATTACK;
+            m_curve.start(m_curve.position(), 1, m_att, m_sample_rate);
+            m_held = true;
           }
         }
         else
         {
           if(gate[i] < 0.1)
           {
-            m_stage       = RELEASE;
-            m_coefficient = onepoleCoefficient(m_rel);
-            m_destination = 0;
-            m_held        = false;
+            m_stage = RELEASE;
+            m_curve.start(m_curve.position(), 0.001, m_rel, m_sample_rate);
+            m_held = false;
           }
         }
-        m_position = m_position * m_coefficient + m_destination * (1-m_coefficient);
+        m_curve.step();
         switch(m_stage)
         {
           case ATTACK:
-            if(m_position >= 0.999)
+            if(m_curve.finished())
             {
-              m_stage       = DECAY;
-              m_coefficient = onepoleCoefficient(m_dec);
-              m_destination = m_sus;
+              m_stage = DECAY;
+              m_curve.start(m_curve.position(), m_sus, m_dec, m_sample_rate);
             }
             break;
           case RELEASE:
-            if(m_position <= 0.00001)
+            if(m_curve.finished())
             {
-              m_stage       = IDLE;
-              m_position    = 0;
-              m_destination = 0;
-              m_coefficient = 0;
+              m_stage = IDLE;
+              m_curve.start(0, 0, 1, m_sample_rate);
             }
             break;
         }
-        *output++ = m_position;
+        *output++ = m_curve.position();
       }
+      g_profiler.addTime("EnvelopeGenerator", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -775,12 +810,68 @@ class EnvelopeGenerator : public Module
     float m_dec;
     float m_sus;
     float m_rel;
-    float m_position;
-    float m_coefficient;
-    float m_destination;
     bool m_held;
     int m_stage;
 };
+/*module EnvelopeGenerator(gate, float att, float dec, float sus, float rel):
+  members:
+    float position = 0, coefficient = 0, destination = 0
+    bool  held     = false
+    int   stage    = 0
+  misc:
+    enum { IDLE = 0, ATTACK, DECAY, SUSTAIN, RELEASE };
+  output_range:
+    *out_min = 0;
+    *out_max = 1;
+  input_range:
+    gate: -1, 1
+  fill:
+    if(!m_held)
+    {
+      if(gate[i] > 0.9)
+      {
+        m_stage       = ATTACK;
+        m_coefficient = onepoleCoefficient(m_att);
+        m_destination = 1;
+        m_held        = true;
+      }
+    }
+    else
+    {
+      if(gate[i] < 0.1)
+      {
+        m_stage       = RELEASE;
+        m_coefficient = onepoleCoefficient(m_rel);
+        m_destination = 0;
+        m_held        = false;
+      }
+    }
+
+    m_position = m_position * m_coefficient + m_destination * (1-m_coefficient);
+
+    switch(m_stage)
+    {
+      case ATTACK:
+        if(m_position >= 0.999)
+        {
+          m_stage       = DECAY;
+          m_coefficient = onepoleCoefficient(m_dec);
+          m_destination = m_sus;
+        }
+        break;
+      case RELEASE:
+        if(m_position <= 0.00001)
+        {
+          m_stage       = IDLE;
+          m_position    = 0;
+          m_destination = 0;
+          m_coefficient = 0;
+        }
+        break;
+    }
+
+    *output++ = m_position;
+*/
 
 
 class SampleAndHold : public Module
@@ -806,16 +897,19 @@ class SampleAndHold : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *source = m_source->output(last_fill, samples);
-      const float *trigger = m_trigger->output(last_fill, samples);
+      const float *source = m_source->output(last_fill, samples, m_sample_rate);
+      const float *trigger = m_trigger->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
-        if(m_last_trigger < 0.1 && trigger[i] > 0.9)
+        if(m_last_trigger < 0.9 && trigger[i] >= 0.9)
           m_value = source[i];
         m_last_trigger = trigger[i];
         *output++ = m_value;
       }
+      g_profiler.addTime("SampleAndHold", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -856,13 +950,16 @@ class Limiter : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *preamp = m_preamp->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *preamp = m_preamp->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = tanh(input[i] * preamp[i]);
       }
+      g_profiler.addTime("Limiter", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -899,12 +996,15 @@ class Rectifier : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = abs(input[i]);
       }
+      g_profiler.addTime("Rectifier", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -943,17 +1043,20 @@ class Clipper : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *min = m_min->output(last_fill, samples);
-      const float *max = m_max->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *min = m_min->output(last_fill, samples, m_sample_rate);
+      const float *max = m_max->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         float sample = input[i];
         if(sample > max[i]) sample = max[i];
         if(sample < min[i]) sample = min[i];
         *output++ = sample;
       }
+      g_profiler.addTime("Clipper", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -994,13 +1097,16 @@ class BitCrusher : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *range = m_range->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *range = m_range->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = int(input[i] * range[i]) / range[i];
       }
+      g_profiler.addTime("BitCrusher", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -1046,11 +1152,13 @@ class AttackRelease : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *attack = m_attack->output(last_fill, samples);
-      const float *release = m_release->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *attack = m_attack->output(last_fill, samples, m_sample_rate);
+      const float *release = m_release->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         if(attack [i] != m_current_attack )
           m_current_attack   = attack [i], m_up   = onepoleCoefficient(attack [i]);
@@ -1062,6 +1170,7 @@ class AttackRelease : public Module
           m_last = m_last*m_down + input[i]*(1-m_down);
         *output++ = m_last;
       }
+      g_profiler.addTime("AttackRelease", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -1108,14 +1217,17 @@ class SlewLimiter : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         if(input[i] > m_last) m_last = input[i]*m_up   + m_last*(1-m_up  );
         else                  m_last = input[i]*m_down + m_last*(1-m_down);
         *output++ = m_last;
       }
+      g_profiler.addTime("SlewLimiter", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -1134,73 +1246,48 @@ class SlewLimiter : public Module
 };
 
 
-class NoteToFrequency : public Module
+class XToFrequency : public Module
 {
   public:
-    NoteToFrequency(vector<ModuleParam *> parameters)
+    XToFrequency(vector<ModuleParam *> parameters)
     {
       m_input = parameters[0]->m_module;
-      m_scale_name = parameters[1]->m_string;
-      m_scale = 0;
-      m_closest_notes = new char[128];
-      for(int i=0; scales[i].name; i++)
-        if(m_scale_name == scales[i].name)
-          m_scale = (char *)(scales[i].steps);
-      if(m_scale == 0)
-        throw(ModuleExcept(string("Unknown scale: ")+m_scale_name));
-      for(int note=0; note<128; note++)
-      {
-        int closest = -128;
-        int step = 0;
-        for(int trying=0; trying<128; trying+=m_scale[step])
-        {
-          if(m_scale[++step] == 0) step = 0;
-          if(abs(trying-note) < abs(closest-note)) closest = trying;
-        }
-        m_closest_notes[note] = closest;
-      }
 
     }
     static Module *create(vector<ModuleParam *> parameters)
     {
-      return new NoteToFrequency(parameters);
+      return new XToFrequency(parameters);
     }
 
-    const char *moduleName() { return "NoteToFrequency"; }
-    ~NoteToFrequency() { delete[] m_closest_notes; }
-    float freqFromNote(float note)
-    {
-      return pow(2.0, m_closest_notes[int(note)]/12.0) * note_0;
-    }
+    const char *moduleName() { return "XToFrequency"; }
 
     
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
-        *output++ = freqFromNote(input[i]);
+        *output++ = freqFromX(input[i]);
       }
+      g_profiler.addTime("XToFrequency", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
     {
-      float min, max;
-      m_input->getOutputRange(&min, &max);
-      *out_min = freqFromNote(min), *out_max = freqFromNote(max);
+      *out_min = 0;
+      *out_max = 4200;
     }
 
     void validateInputRange()
     {
-      validateWithin(*m_input, 0, 127);
+      validateWithin(*m_input, -1, 1);
     }
   private:
     Module *m_input;
-    string m_scale_name;
-    char* m_scale;
-    char* m_closest_notes;
 };
 
 
@@ -1223,12 +1310,15 @@ class MixDown : public Module
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = *input++ + *input++;
       }
+      g_profiler.addTime("MixDown", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -1267,14 +1357,17 @@ class Pan : public StereoModule
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *position = m_position->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *position = m_position->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = input[i] * (1.0-position[i]);
         *output++ = input[i] *      position[i];
       }
+      g_profiler.addTime("Pan", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -1312,14 +1405,17 @@ class StereoAdd : public StereoModule
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *a = m_a->output(last_fill, samples);
-      const float *b = m_b->output(last_fill, samples);
+      const float *a = m_a->output(last_fill, samples, m_sample_rate);
+      const float *b = m_b->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         *output++ = *a++ + *b++;
         *output++ = *a++ + *b++;
       }
+      g_profiler.addTime("StereoAdd", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -1351,7 +1447,7 @@ class PingPongDelay : public StereoModule
       m_wet = parameters[3]->m_module;
       m_dry = parameters[4]->m_module;
       m_feedback = parameters[5]->m_module;
-      m_length = int(m_len*sample_rate);
+      m_length = int(m_len*m_sample_rate);
       m_buffer_left = new float[m_length];
       m_buffer_right = new float[m_length];
       m_read_pos = 1;
@@ -1378,12 +1474,14 @@ class PingPongDelay : public StereoModule
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *wet = m_wet->output(last_fill, samples);
-      const float *dry = m_dry->output(last_fill, samples);
-      const float *feedback = m_feedback->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *wet = m_wet->output(last_fill, samples, m_sample_rate);
+      const float *dry = m_dry->output(last_fill, samples, m_sample_rate);
+      const float *feedback = m_feedback->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         float left_sample = m_buffer_left[m_read_pos]*m_filter +
                             m_last_sample_left*(1-m_filter);
@@ -1399,6 +1497,7 @@ class PingPongDelay : public StereoModule
         if(++m_write_pos >= m_length) m_write_pos -= m_length;
         if(++m_read_pos  >= m_length) m_read_pos  -= m_length;
       }
+      g_profiler.addTime("PingPongDelay", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -1452,10 +1551,12 @@ class Rotate : public StereoModule
     void fill(float last_fill, int samples)
     {
       float *output = m_output;
-      const float *input = m_input->output(last_fill, samples);
-      const float *angle = m_angle->output(last_fill, samples);
+      const float *input = m_input->output(last_fill, samples, m_sample_rate);
+      const float *angle = m_angle->output(last_fill, samples, m_sample_rate);
 
-      for(int i=0; i<samples; i++)
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
       {
         float left  = *input++;
         float right = *input++;
@@ -1463,6 +1564,7 @@ class Rotate : public StereoModule
         *output++ = left*cos_mul + right*sin_mul;
         *output++ = left*sin_mul + right*cos_mul;
       }
+      g_profiler.addTime("Rotate", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -1532,8 +1634,8 @@ class Delay : public Module
   public:
     Delay(float length, float filter, Module &input, Module &wet, Module &dry,
           Module &feedback, Module &speed)
-    : m_buffer(new float[int(length*sample_rate)]),
-      m_length(int(length*sample_rate)),
+    : m_buffer(new float[int(length*m_sample_rate)]),
+      m_length(int(length*m_sample_rate)),
       m_read_pos(1), m_write_pos(0), m_last_sample(0), m_filter(filter),
       m_input(input), m_wet(wet), m_dry(dry), m_feedback(feedback),
       m_speed(speed)
@@ -1617,7 +1719,7 @@ void fillModuleList()
   g_module_infos["Sample"] = new ModuleInfo("Sample", Sample::create);
   g_module_infos["Sample"]->addParameter("sample_name", "string");
   g_module_infos["Sample"]->addParameter("frequency", "Module");
-  g_module_infos["Sample"]->addParameter("retrigger", "Module", 0);
+  g_module_infos["Sample"]->addParameter("trigger", "Module", 0);
   g_module_infos["Sample"]->addParameter("loop_start", "Module", 0);
   g_module_infos["Sample"]->addParameter("loop_end", "Module", 1);
   g_module_infos["Rescaler"] = new ModuleInfo("Rescaler", Rescaler::create);
@@ -1665,9 +1767,8 @@ void fillModuleList()
   g_module_infos["SlewLimiter"]->addParameter("input", "Module");
   g_module_infos["SlewLimiter"]->addParameter("up", "float");
   g_module_infos["SlewLimiter"]->addParameter("down", "float");
-  g_module_infos["NoteToFrequency"] = new ModuleInfo("NoteToFrequency", NoteToFrequency::create);
-  g_module_infos["NoteToFrequency"]->addParameter("input", "Module");
-  g_module_infos["NoteToFrequency"]->addParameter("scale_name", "string");
+  g_module_infos["XToFrequency"] = new ModuleInfo("XToFrequency", XToFrequency::create);
+  g_module_infos["XToFrequency"]->addParameter("input", "Module");
   g_module_infos["MixDown"] = new ModuleInfo("MixDown", MixDown::create);
   g_module_infos["MixDown"]->addParameter("input", "StereoModule");
   g_module_infos["Pan"] = new ModuleInfo("Pan", Pan::create);
