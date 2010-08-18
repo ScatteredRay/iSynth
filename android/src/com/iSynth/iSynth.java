@@ -11,7 +11,8 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.KeyEvent;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -21,6 +22,11 @@ public class iSynth extends Activity {
     private XYView panel;
     private Audio aud;
     private InputPosition inp;
+    private String[] patches;
+    
+    private static final int PATCH_GID = 1;
+    private static final int SCALE_GID = 2;
+    private static final int KEY_GID = 3;
 
     /** Called when the activity is first created. */
     @Override
@@ -30,9 +36,6 @@ public class iSynth extends Activity {
         inp = new InputPosition();
         panel = new XYView(this, inp);
         setContentView(panel);
-        registerForContextMenu(panel);
-
-        //setContentView(R.layout.main);
     }
 
     @Override
@@ -48,7 +51,65 @@ public class iSynth extends Activity {
         super.onStop();
         aud.interrupt();
     }
+    
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        Menu patchmenu = menu.addSubMenu(Menu.NONE, Menu.NONE, 0, "patch");
+        for (String p: patches) {
+            patchmenu.add(PATCH_GID, Menu.NONE, Menu.NONE, p.substring(0,p.length()-8));
+        }
+        
+        Menu scalemenu = menu.addSubMenu(Menu.NONE, Menu.NONE, 0, "scale");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Major");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Minor");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Dorian");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Phrygian");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Lydian");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Mixolydian");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Locrian");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Pentatonic");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "PentMinor");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Chromatic");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Whole");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Minor 3rd");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "3rd");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "4th");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "5th");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Octave");
 
+        Menu keymenu = menu.addSubMenu(Menu.NONE, Menu.NONE, 0, "key");
+        keymenu.add(KEY_GID, 0, Menu.NONE, "C");
+        keymenu.add(KEY_GID, 1, Menu.NONE, "C#/Db");
+        keymenu.add(KEY_GID, 2, Menu.NONE, "D");
+        keymenu.add(KEY_GID, 3, Menu.NONE, "D#/Eb");
+        keymenu.add(KEY_GID, 4, Menu.NONE, "E");
+        keymenu.add(KEY_GID, 5, Menu.NONE, "F");
+        keymenu.add(KEY_GID, 6, Menu.NONE, "F#/Gb");
+        keymenu.add(KEY_GID, 7, Menu.NONE, "G");
+        keymenu.add(KEY_GID, 8, Menu.NONE, "G#/Ab");
+        keymenu.add(KEY_GID, 9, Menu.NONE, "A");
+        keymenu.add(KEY_GID, 10, Menu.NONE, "A#/Bb");
+        keymenu.add(KEY_GID, 11, Menu.NONE, "B");
+
+        return true;
+    }
+    
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getGroupId()) {
+        case PATCH_GID:
+            setPatch(item.getTitle()+".pat");
+            return true;
+        case SCALE_GID:
+            setScale(item.getTitle().toString().toLowerCase());
+            return true;
+        case KEY_GID:
+            setKey(item.getItemId());
+            return true;
+        default:
+            return super.onOptionsItemSelected(item);
+        }
+    }
     /**
      * Provides a list of packaged patches and samples for the jni side, along with
      * lengths and offsets within the apk file.
@@ -70,26 +131,20 @@ public class iSynth extends Activity {
         }
         AssetManager am = getAssets();
         try {
-            String[] fns = am.list("patches");
-            String[] args = new String[fns.length+1];
-            args[0] = "iSynth";
+            patches = am.list("patches");
             
             String relpath;
-            for (int i=0; i<fns.length; ++i) {
-                relpath = "patches/"+fns[i];
+            for (String patch: patches) {
+                relpath = "patches/"+patch;
                 AssetFileDescriptor afd = am.openFd(relpath);
                 relpath = relpath.substring(0, relpath.length()-4);
                 addFile(relpath, afd.getStartOffset(), afd.getLength());
                 afd.close();
-
-                args[i+1]=new String(relpath);
             }
             
-            setArgs(args);
-            
-            fns = am.list("samples");
-            for (int i=0; i<fns.length; ++i) {
-                relpath = "samples/"+fns[i];
+            String[] fns = am.list("samples");
+            for (String fn: fns) {
+                relpath = "samples/"+fn;
                 AssetFileDescriptor afd = am.openFd(relpath);
                 addFile(relpath.substring(0, relpath.length()-4), afd.getStartOffset(), afd.getLength());
                 afd.close();
@@ -102,38 +157,15 @@ public class iSynth extends Activity {
 
 
     }
-
-
-    //this isn't getting called for some reason, so i've worked it
-    //into onKeyDown for now.
-    @Override
-    public void onBackPressed() {
-         inp.setNextPatch(-1);
-    }
     
-    @Override
-    public boolean onSearchRequested() {
-        inp.setNextPatch(1);
-        return true;
-    }
     
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent ev) {
-        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            inp.setNextPatch(1);
-            return true;
-        }
-        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
-            keyCode == KeyEvent.KEYCODE_BACK) {
-            inp.setNextPatch(-1);
-            return true;
-        }
-        return false;
-    }
 
     private native void setApkPath(String path);
     private native void addFile(String name, long pos, long len);
-    private native void setArgs(String[] args);
+    private native void setPatch(String patch);
+    private native void setScale(String scale);
+    private native void setKey(int key);
+//    private native void setOctave(int octave);
 
 
     static {
@@ -147,7 +179,6 @@ class InputPosition {
     private boolean down=false;
     private int w=600;
     private int h=600;
-    private int nextPatch=0;
     
     public synchronized float getXScaled() {
         x = Math.max(0, Math.min(w, x));
@@ -172,17 +203,6 @@ class InputPosition {
     public synchronized void setDimensions(int w, int h) {
         this.w = w;
         this.h = h;
-    }
-    
-    public synchronized void setNextPatch(int d) {
-        this.nextPatch = d;
-    }
-    
-    public synchronized int getNextPatch() {
-        int tmp=nextPatch;
-        nextPatch=0;
-        return tmp;
-
     }
 }
 
@@ -212,7 +232,6 @@ class Audio extends Thread {
     private native short[] produceStream(short[] buffer, int count);
     private native void inputXY(float X, float Y);
     private native void inputDown(boolean d);
-    private native void nextPatch(int d);
 
     public void run() {
         if (at.getState() != AudioTrack.STATE_INITIALIZED) {
@@ -221,7 +240,6 @@ class Audio extends Thread {
         }
         short[] buf = new short[buf_size];
         at.play();
-        int np;
         for (;;) {
             inputXY(inp.getXScaled(), inp.getYScaled());
             inputDown(inp.isDown());
@@ -231,10 +249,6 @@ class Audio extends Thread {
             if(interrupted()) {
                 at.stop();
                 return;
-            }
-            np = inp.getNextPatch();
-            if (np != 0) {
-                nextPatch(np);
             }
         }
     }
@@ -260,9 +274,6 @@ class XYView extends SurfaceView implements SurfaceHolder.Callback {
         return true;
     }
 
- 
- 
-    
 
     public void surfaceCreated(SurfaceHolder sh) {}
     public void surfaceDestroyed(SurfaceHolder sh) {}

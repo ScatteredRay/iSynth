@@ -2,6 +2,14 @@
 #include <jni.h>
 #include <android/log.h>
 #include "input.h"
+#include "synth.h"
+
+
+#ifdef PROFILING
+#include <sys/time.h>
+#endif
+
+using std::string;
 
 #define D(s) __android_log_write(ANDROID_LOG_DEBUG, "input_jni.cpp", s)
 #define E(s) __android_log_write(ANDROID_LOG_ERROR, "input_jni.cpp", s)
@@ -10,27 +18,31 @@ static float x;
 static float y;
 static float down;
 
-static int argc;
-static char **argv;
-
-void initInput() {
+void initInput(int argc, char **argv) {
     x = y = down = 0.0f;
 }
 
-int argCount() {
-    return argc;
+void deinitInput() { }
+
+void populateLogList(std::vector<std::string>& log_list) { }
+
+double hires_time() {
+#ifdef PROFILING
+    timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec + tv.tv_usec/1e6;
+#else
+    return 0.0;
+#endif
 }
-char *getArg(int n) {
-    if (0 <= n && n < argc)
-        return argv[n];
+
+char getKey() {
     return 0;
 }
 
-void readInputAxis(int axis, float *buffer, int size)
-{
+void readInputAxis(int axis, float *buffer, int size) {
     float src;
-    switch(axis)
-    {
+    switch(axis) {
         case 0:
             src = x;
             break;
@@ -64,18 +76,29 @@ Java_com_iSynth_Audio_inputDown(JNIEnv *env, jobject obj, jboolean d)
     down = d==JNI_TRUE? 1.0f: 0.0f;
 }
 
+JNIEXPORT void JNICALL
+Java_com_iSynth_iSynth_setPatch(JNIEnv *env, jobject obj, jstring patch) {
+    static string currentpatch="";
+    const char *cstr = env->GetStringUTFChars(patch, NULL);
+
+    currentpatch = cstr;
+    synthSetPatch(currentpatch);
+
+    env->ReleaseStringUTFChars(patch, NULL);
+}
 
 JNIEXPORT void JNICALL
-Java_com_iSynth_iSynth_setArgs(JNIEnv *env, jobject obj, jobjectArray args) {
-    argc = env->GetArrayLength(args);
-    argv = new char*[argc];
-    for (int i(0); i < argc; ++i) {
-        jstring jstr = (jstring)env->GetObjectArrayElement(args, i);
-        const char *str = env->GetStringUTFChars(jstr, NULL);
-        argv[i] = new char[strlen(str)+1];
-        strcpy(argv[i], str);
-        env->ReleaseStringUTFChars(jstr, NULL);
-    }
+Java_com_iSynth_iSynth_setScale(JNIEnv *env, jobject obj, jstring scale) {
+    const char *cstr = env->GetStringUTFChars(scale, NULL);
+
+    synthSetScale(cstr);
+
+    env->ReleaseStringUTFChars(scale, NULL);
+}
+
+JNIEXPORT void JNICALL
+Java_com_iSynth_iSynth_setKey(JNIEnv *env, jobject obj, jint key) {
+    synthSetKey((int)key);
 }
 
 } //extern "C"

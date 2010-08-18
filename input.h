@@ -7,13 +7,9 @@
 void initInput(int argc, char **argv);
 void deinitInput();
 
-void populatePatchList(std::vector<std::string>& patches);
 void populateLogList(std::vector<std::string>& log_list);
 
 double hires_time();
-
-int argCount();
-char *getArg(int n);
 
 void readInputAxis(int axis, float *buffer, int size);
 char getKey();

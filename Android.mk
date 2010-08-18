@@ -23,10 +23,12 @@ LOCAL_CFLAGS	+= -I$(STLPORT_BASE)/stlport \
 		   -D__NEW__ \
 		   -D__SGI_STL_INTERNAL_PAIR_H \
 		   -DANDROID \
-		   -DOS_ANDROID
+		   -DOS_ANDROID \
+		   -O2
 LOCAL_LDLIBS	+= -L$(STLPORT_BASE)/build/lib/obj/arm-linux-gcc/so \
 		   -lstlport \
-		   -llog
+		   -llog \
+		   -lgcc
 LOCAL_SRC_FILES := input_jni.cpp audio_jni.cpp file_jni.cpp synth.cpp
 
 include $(BUILD_SHARED_LIBRARY)
