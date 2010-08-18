@@ -22,7 +22,7 @@ Pulse osc2(freq_detuned, 0.8)
 Add oscs(osc1_rect, osc2)
 
 #filter
-EnvelopeGenerator env(touch, 0.03, 4, 0.5, 0.1)
+200 EnvelopeGenerator env(touch, 0.03, 4, 0.5, 0.1)
 200 Rescaler cutoff_env(env, 100, 700)
 200 Rescaler cutoff_y(y, 0.25, 1)
 200 Multiply cutoff(cutoff_y, cutoff_env)

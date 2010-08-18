@@ -17,7 +17,7 @@ Saw osc(freq)
 Filter filter(osc, cutoff, 0.9)
 
 #amp
-2000 EnvelopeGenerator amp(touch, 0.1, 0.5, 0.5, 0.1)
+400 EnvelopeGenerator amp(touch, 0.1, 0.5, 0.5, 0.1)
 Multiply notes(filter, amp)
 
 #panning
