@@ -1,5 +1,5 @@
 #include <cstdio>
-#include "audio.h"
+#include "io.h"
 #include "exception.h"
 #include "input.h"
 #include "synth.h"
@@ -9,7 +9,7 @@ int main(int argc, char **argv)
   try
   {
     initInput(argc, argv);
-    makeNoise();
+    ioLoop();
     deinitInput();
     puts(describeTimeSpent());
   }

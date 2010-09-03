@@ -1246,44 +1246,20 @@ class SlewLimiter : public Module
 };
 
 
-class NoteToFrequency : public Module
+class XToFrequency : public Module
 {
   public:
-    NoteToFrequency(vector<ModuleParam *> parameters)
+    XToFrequency(vector<ModuleParam *> parameters)
     {
       m_input = parameters[0]->m_module;
-      m_scale_name = parameters[1]->m_string;
-      m_scale = 0;
-      m_closest_notes = new char[128];
-      for(int i=0; scales[i].name; i++)
-        if(m_scale_name == scales[i].name)
-          m_scale = (char *)(scales[i].steps);
-      if(m_scale == 0)
-        throw(ModuleExcept(string("Unknown scale: ")+m_scale_name));
-      for(int note=0; note<128; note++)
-      {
-        int closest = -128;
-        int step = 0;
-        for(int trying=0; trying<128; trying+=m_scale[step])
-        {
-          if(m_scale[++step] == 0) step = 0;
-          if(abs(trying-note) < abs(closest-note)) closest = trying;
-        }
-        m_closest_notes[note] = closest;
-      }
 
     }
     static Module *create(vector<ModuleParam *> parameters)
     {
-      return new NoteToFrequency(parameters);
+      return new XToFrequency(parameters);
     }
 
-    const char *moduleName() { return "NoteToFrequency"; }
-    ~NoteToFrequency() { delete[] m_closest_notes; }
-    float freqFromNote(float note)
-    {
-      return pow(2.0, m_closest_notes[int(note)]/12.0) * note_0;
-    }
+    const char *moduleName() { return "XToFrequency"; }
 
     
     void fill(float last_fill, int samples)
@@ -1295,27 +1271,23 @@ class NoteToFrequency : public Module
       int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
       for(int i=0; i<sample_count; i++)
       {
-        *output++ = freqFromNote(input[i]);
+        *output++ = freqFromX(input[i]);
       }
-      g_profiler.addTime("NoteToFrequency", hires_time()-time);
+      g_profiler.addTime("XToFrequency", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
     {
-      float min, max;
-      m_input->getOutputRange(&min, &max);
-      *out_min = freqFromNote(min), *out_max = freqFromNote(max);
+      *out_min = 0;
+      *out_max = 4200;
     }
 
     void validateInputRange()
     {
-      validateWithin(*m_input, 0, 127);
+      validateWithin(*m_input, -1, 1);
     }
   private:
     Module *m_input;
-    string m_scale_name;
-    char* m_scale;
-    char* m_closest_notes;
 };
 
 
@@ -1795,9 +1767,8 @@ void fillModuleList()
   g_module_infos["SlewLimiter"]->addParameter("input", "Module");
   g_module_infos["SlewLimiter"]->addParameter("up", "float");
   g_module_infos["SlewLimiter"]->addParameter("down", "float");
-  g_module_infos["NoteToFrequency"] = new ModuleInfo("NoteToFrequency", NoteToFrequency::create);
-  g_module_infos["NoteToFrequency"]->addParameter("input", "Module");
-  g_module_infos["NoteToFrequency"]->addParameter("scale_name", "string");
+  g_module_infos["XToFrequency"] = new ModuleInfo("XToFrequency", XToFrequency::create);
+  g_module_infos["XToFrequency"]->addParameter("input", "Module");
   g_module_infos["MixDown"] = new ModuleInfo("MixDown", MixDown::create);
   g_module_infos["MixDown"]->addParameter("input", "StereoModule");
   g_module_infos["Pan"] = new ModuleInfo("Pan", Pan::create);

@@ -4,9 +4,7 @@
 200 Input touch(2)
 
 #note
-200 Rescaler note(x, 46, 70)
-200 Quantize note_quant(note)
-200 NoteToFrequency note_freq(note_quant, "mixolydian")
+200 XToFrequency note_freq(x)
 
 # vibrato
 200 Sine vibrato_lfo(5)
@@ -38,6 +36,6 @@ Multiply notes(filter, vol)
 
 #panning
 200 Rescaler panpos(x, 0.15, 0.85)
-Pan panned_notes(notes, panpos)
+Pan panned_notes(notes, 0.5)
 PingPongDelay delay(0.5, 0.5, notes, 0.5, 0, 0.3)
 StereoAdd output(delay, panned_notes)

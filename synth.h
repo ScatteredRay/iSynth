@@ -1,9 +1,23 @@
 #ifndef _SYNTH_H
 #define _SYNTH_H
 
-void synthProduceStream(short *buffer, int samples);
-void synthNextPatch(int offset = 1);
+#include "file.h"
 
+void synthProduceStream(short *buffer, int samples);
 char *describeTimeSpent();
+
+void synthSetPatch(const FileRef &);
+void synthSetKey  (int key);
+void synthSetScale(const char *name);
+void synthSetRange(int start_octave, int octave_range);
+
+struct scale
+{ 
+  const char *name;
+  const char *steps;
+};
+
+extern scale g_scales[];
+extern char *g_keys[];
 
 #endif

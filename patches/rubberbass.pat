@@ -4,10 +4,8 @@
 200 Input touch(2)
 
 #note
-200 Rescaler note(x, 24, 48)
-200 Quantize note_quant(note)
-200 NoteToFrequency note_freq(note_quant, "lydian")
-SlewLimiter note_freq_sl(note_freq, .0005, .0005)
+200 XToFrequency note_freq(x)
+200 SlewLimiter note_freq_sl(note_freq, .05, .05)
 
 #vibrato
 200 Sine vibrato_lfo(3)
@@ -24,7 +22,7 @@ Pulse osc2(freq_detuned, 0.8)
 Add oscs(osc1_rect, osc2)
 
 #filter
-EnvelopeGenerator env(touch, 0.03, 4, 0.5, 0.1)
+200 EnvelopeGenerator env(touch, 0.03, 4, 0.5, 0.1)
 200 Rescaler cutoff_env(env, 100, 700)
 200 Rescaler cutoff_y(y, 0.25, 1)
 200 Multiply cutoff(cutoff_y, cutoff_env)

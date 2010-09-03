@@ -1,4 +1,4 @@
-#include "audio.h"
+#include "io.h"
 
 #include <dsound.h>
 #include <windows.h>
@@ -6,8 +6,8 @@
 #include <dxerr.h>
 
 #include "exception.h"
-#include "input.h"
 #include "synth.h"
+#include "ui.h"
 
 IDirectSoundBuffer *buffer;
 HANDLE notification_event;
@@ -87,10 +87,7 @@ void streamSound(unsigned int buffer_size)
   
   for(;;)
   {
-    char key = getKey();
-    if(key == K_ESCAPE) return;
-    if(key == K_RIGHT ) synthNextPatch(-1);
-    if(key == K_LEFT  ) synthNextPatch();
+    if(uiTick()) return;
     
     DWORD event = MsgWaitForMultipleObjects(1, &notification_event, false,
                                             INFINITE,  QS_ALLEVENTS);
@@ -153,8 +150,9 @@ void streamSound(unsigned int buffer_size)
   }
 }
 
-void makeNoise()
+void ioLoop()
 { 
+  uiInit();
   setupSound (1024);
   streamSound(1024);
 }
