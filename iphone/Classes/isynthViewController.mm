@@ -6,7 +6,7 @@
 //  Copyright Apple Inc 2010. All rights reserved.
 //
 
-#include "audio.h"
+#include "io.h"
 #include "input.h"
 void beginStreamSound();
 void endStreamSound();

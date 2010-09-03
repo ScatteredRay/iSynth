@@ -58,7 +58,7 @@ void populatePatchList(vector<string>& patches)
     
     CFURLRef patch = CFBundleCopyResourceURL(
                       Bundle,
-                      CFSTR("fmbass"),
+                      CFSTR("rubberbass"),
                       CFSTR("pat"),
                       NULL);
                       
@@ -78,7 +78,7 @@ void populatePatchList(vector<string>& patches)
     CFRelease(path);
 }
 
-void setupLogging(vector<string>& log_list)
+void populateLogList(vector<string>& log_list)
 {
 }
 
