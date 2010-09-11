@@ -154,4 +154,7 @@ char getKey() {
 	return 0;
 }
 
-
+std::string getPatchLocation(const char* patchname)
+{
+    return string("patches/") + patchname + string(".pat");
+}

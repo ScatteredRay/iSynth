@@ -53,12 +53,19 @@ using namespace std;
 
 void populatePatchList(vector<string>& patches)
 {
-    CFBundleRef Bundle = CFBundleGetMainBundle();
+    patches.push_back(getPatchLocation("rubberbass"));
+}
+
+std::string getPatchLocation(const char* patchname)
+{
+   CFBundleRef Bundle = CFBundleGetMainBundle();
     assert(Bundle);
     
     CFURLRef patch = CFBundleCopyResourceURL(
                       Bundle,
-                      CFSTR("rubberbass"),
+                      CFStringCreateWithCString(kCFAllocatorDefault,
+                                                patchname,
+                                                kCFStringEncodingMacRoman),
                       CFSTR("pat"),
                       NULL);
                       
@@ -68,7 +75,7 @@ void populatePatchList(vector<string>& patches)
     char* cpath = (char*)malloc(pathlen);
     CFStringGetCString(path, cpath, pathlen, kCFStringEncodingMacRoman);
     assert(cpath);
-    patches.push_back(string(cpath));
+    string ret = string(cpath);
     
     
     // The ptr is owned by the CFStringRef, but since we've copied it onto a
@@ -76,6 +83,8 @@ void populatePatchList(vector<string>& patches)
     free(cpath);
     CFRelease(patch);
     CFRelease(path);
+
+    return ret;
 }
 
 void populateLogList(vector<string>& log_list)

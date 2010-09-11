@@ -176,3 +176,8 @@ double hires_time()
   QueryPerformanceFrequency(&f);
   return double(c.QuadPart)/double(f.QuadPart);
 }
+
+std::string getPatchLocation(const char* patchname)
+{
+    return string("patches/") + patchname + string(".pat");
+}

@@ -8,6 +8,7 @@
 
 #include "io.h"
 #include "input.h"
+#include "synth.h"
 void beginStreamSound();
 void endStreamSound();
 void setupSound();
@@ -42,6 +43,9 @@ void inputXY(float X, float Y);
 - (void)viewDidLoad {
     [super viewDidLoad];
 	initInput(0, NULL);
+    synthSetScale("major");
+    synthSetKey(0);
+    synthSetRange(4, 2);
 	setupSound();
 	beginStreamSound();
 }

@@ -142,18 +142,7 @@
 		29B97317FDCFA39411CA2CEA /* Resources-iPad */ = {
 			isa = PBXGroup;
 			children = (
-				A996AA1C11866AF500CD448D /* test_input.pat */,
-				A996AA1D11866AF500CD448D /* test_noinput.pat */,
-				A939E94B11852E3000EE073E /* acousticdrums.pat */,
-				A939E94C11852E3000EE073E /* badpiano.pat */,
-				A939E94D11852E3000EE073E /* drums.pat */,
-				A939E94E11852E3000EE073E /* fmbass.pat */,
-				A939E94F11852E3000EE073E /* fmreed.pat */,
-				A939E95011852E3000EE073E /* lewp.pat */,
-				A939E95111852E3000EE073E /* pad.pat */,
-				A939E95211852E3000EE073E /* retrigpulser.pat */,
-				A939E95311852E3000EE073E /* rubberbass.pat */,
-				A939E95411852E3000EE073E /* toms.pat */,
+				A9868AF3123AFEFE00B6EB13 /* patches */,
 				2899E5210DE3E06400AC0155 /* isynthViewController.xib */,
 				28AD733E0D9D9553002E5188 /* MainWindow.xib */,
 				A9BF6E6E116C027500E339A3 /* isynth-Info.plist */,
@@ -171,6 +160,25 @@
 				A9502DDC11168261007CFD97 /* AudioToolbox.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A9868AF3123AFEFE00B6EB13 /* patches */ = {
+			isa = PBXGroup;
+			children = (
+				A996AA1C11866AF500CD448D /* test_input.pat */,
+				A996AA1D11866AF500CD448D /* test_noinput.pat */,
+				A939E94B11852E3000EE073E /* acousticdrums.pat */,
+				A939E94C11852E3000EE073E /* badpiano.pat */,
+				A939E94D11852E3000EE073E /* drums.pat */,
+				A939E94E11852E3000EE073E /* fmbass.pat */,
+				A939E94F11852E3000EE073E /* fmreed.pat */,
+				A939E95011852E3000EE073E /* lewp.pat */,
+				A939E95111852E3000EE073E /* pad.pat */,
+				A939E95211852E3000EE073E /* retrigpulser.pat */,
+				A939E95311852E3000EE073E /* rubberbass.pat */,
+				A939E95411852E3000EE073E /* toms.pat */,
+			);
+			name = patches;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

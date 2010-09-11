@@ -6,7 +6,7 @@
 void synthProduceStream(short *buffer, int samples);
 char *describeTimeSpent();
 
-void synthSetPatch(const FileRef &);
+void synthSetPatch(const char*);
 void synthSetKey  (int key);
 void synthSetScale(const char *name);
 void synthSetRange(int start_octave, int octave_range);

@@ -15,6 +15,8 @@ double hires_time();
 int argCount();
 char *getArg(int n);
 
+std::string getPatchLocation(const char* patchname);
+
 void readInputAxis(int axis, float *buffer, int size);
 char getKey();
 
