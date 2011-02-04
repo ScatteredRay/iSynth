@@ -7,9 +7,9 @@
 200 XToFrequency freq(x)
 
 #noise
-2000 EnvelopeGenerator mod_amt(touch, 0.01, 0.5, 0.2, 0.2)
-2000 Rescaler y_mod(y, 0, 0.8)
-2000 Multiply mod_amp(mod_amt, y_mod)
+200 EnvelopeGenerator mod_amt(touch, 0.01, 0.5, 0.2, 0.2)
+200 Rescaler y_mod(y, 0, 0.8)
+200 Multiply mod_amp(mod_amt, y_mod)
 Sine mod_unit(freq, touch)
 Multiply mod(mod_unit, mod_amp)
 Sine carrier(freq, touch, mod)

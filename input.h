@@ -11,6 +11,8 @@ void populateLogList(std::vector<std::string>& log_list);
 
 double hires_time();
 
+std::string getPatchLocation(const char* patchname);
+
 void readInputAxis(int axis, float *buffer, int size);
 char getKey();
 

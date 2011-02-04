@@ -36,7 +36,6 @@ Multiply notes(filter, vol)
 
 #panning
 200 Rescaler panpos(x, 0.15, 0.85)
-Multiply panpos_(panpos, 1)
 Pan panned_notes(notes, 0.5)
 PingPongDelay delay(0.5, 0.5, notes, 0.5, 0, 0.3)
 StereoAdd output(delay, panned_notes)

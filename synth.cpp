@@ -122,7 +122,7 @@ scale g_scales[] =
 
 int g_key = 0;
 char g_closest_notes[128];
-FileRef g_patch("pad.pat");
+const char* g_patch("pad");
 int g_octave_range = 2;
 int g_start_octave = 4;
 
@@ -793,13 +793,13 @@ static vector<FileRef> g_log_list;
 static Module *g_stream_output;
 float g_audio_time = 0;
 
-Module *loadPatch(const FileRef &filename)
+Module *loadPatch(const char* patchname)
 {
   g_modules.clear();
   g_profiler.clear();
   g_audio_time = 0;
   
-  File in(string("patches/") + filename, File::READ);
+  File in(getPatchLocation(patchname), File::READ);
 
   string s;
   while(!in.eof())
@@ -832,7 +832,7 @@ void synthSetRange(int start_octave, int octave_range)
   g_start_octave = start_octave;
 }
 
-void synthSetPatch(const FileRef &patch)
+void synthSetPatch(const char* patch)
 {
   g_patch = patch;
   g_stream_output = loadPatch(patch);  

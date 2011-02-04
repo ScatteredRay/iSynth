@@ -1,6 +1,8 @@
-#include "input.h"
-#include <CoreFoundation/CFBundle.h>
 #include <assert.h>
+#include <CoreFoundation/CFBundle.h>
+#include "input.h"
+#include <mach/mach.h>
+#include <mach/mach_time.h>
 
 float osx_x;
 float osx_y;
@@ -51,12 +53,19 @@ using namespace std;
 
 void populatePatchList(vector<string>& patches)
 {
-    CFBundleRef Bundle = CFBundleGetMainBundle();
+    patches.push_back(getPatchLocation("rubberbass"));
+}
+
+std::string getPatchLocation(const char* patchname)
+{
+   CFBundleRef Bundle = CFBundleGetMainBundle();
     assert(Bundle);
     
     CFURLRef patch = CFBundleCopyResourceURL(
                       Bundle,
-                      CFSTR("fmbass"),
+                      CFStringCreateWithCString(kCFAllocatorDefault,
+                                                patchname,
+                                                kCFStringEncodingMacRoman),
                       CFSTR("pat"),
                       NULL);
                       
@@ -66,7 +75,7 @@ void populatePatchList(vector<string>& patches)
     char* cpath = (char*)malloc(pathlen);
     CFStringGetCString(path, cpath, pathlen, kCFStringEncodingMacRoman);
     assert(cpath);
-    patches.push_back(string(cpath));
+    string ret = string(cpath);
     
     
     // The ptr is owned by the CFStringRef, but since we've copied it onto a
@@ -74,8 +83,20 @@ void populatePatchList(vector<string>& patches)
     free(cpath);
     CFRelease(patch);
     CFRelease(path);
+
+    return ret;
 }
 
-void setupLogging(vector<string>& log_list)
+void populateLogList(vector<string>& log_list)
 {
+}
+
+double hires_time()
+{
+  mach_timebase_info_data_t info;
+  mach_timebase_info(&info);
+  uint64_t time = mach_absolute_time();
+  uint64_t nanoseconds = time * info.numer / info.denom;
+  return 
+    (double)nanoseconds / 1000000000.0;
 }
