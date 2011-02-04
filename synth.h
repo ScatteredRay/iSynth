@@ -18,6 +18,6 @@ struct scale
 };
 
 extern scale g_scales[];
-extern char *g_keys[];
+extern const char *g_keys[];
 
 #endif

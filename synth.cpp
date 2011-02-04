@@ -92,7 +92,7 @@ const float note_0 = 8.1757989156;
 const float middle_c = 261.625565;
 const int g_sample_rate = 44100;
 
-char *g_keys[] =
+const char *g_keys[] =
 {
   "C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb",
   "B"
