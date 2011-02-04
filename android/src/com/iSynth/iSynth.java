@@ -21,7 +21,6 @@ import android.view.SurfaceView;
 public class iSynth extends Activity {
     private XYView panel;
     private Audio aud;
-    private InputPosition inp;
     private String[] patches;
     
     private static final int PATCH_GID = 1;
@@ -33,15 +32,17 @@ public class iSynth extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         indexFiles();
-        inp = new InputPosition();
-        panel = new XYView(this, inp);
+
+        panel = new XYView(this);
+        setScale("major");
+        setKey(0);
         setContentView(panel);
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        aud = new Audio(inp);
+        aud = new Audio();
         aud.setPriority(Thread.MAX_PRIORITY);
         aud.start();
     }
@@ -71,7 +72,7 @@ public class iSynth extends Activity {
         scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "PentMinor");
         scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Chromatic");
         scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Whole");
-        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Minor 3rd");
+        scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "Minor3rd");
         scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "3rd");
         scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "4th");
         scalemenu.add(SCALE_GID, Menu.NONE, Menu.NONE, "5th");
@@ -174,47 +175,46 @@ public class iSynth extends Activity {
 }
 
 class InputPosition {
-    private float x=0;
-    private float y=0;
-    private boolean down=false;
-    private int w=600;
-    private int h=600;
+    private static float x=0;
+    private static float y=0;
+    private static boolean down=false;
+    private static int w=600;
+    private static int h=600;
     
-    public synchronized float getXScaled() {
+    public static synchronized float getXScaled() {
         x = Math.max(0, Math.min(w, x));
         return x*2/w - 1;
     }
 
-    public synchronized void setXY(float x, float y) {
-        this.x = x;
-        this.y = y;
+    public static synchronized void setXYD(float x, float y, boolean down) {
+        InputPosition.x = x;
+        InputPosition.y = y;
+        InputPosition.down = down;
     }
 
-    public synchronized float getYScaled() {
+    public static synchronized float getYScaled() {
         y = Math.max(0, Math.min(h, y));
         return 1 - y*2/h;
     }
-    public synchronized boolean isDown() {
+    public static synchronized boolean isDown() {
         return down;
     }
-    public synchronized void setDown(boolean down) {
-        this.down = down;
+    public static synchronized void setDown(boolean down) {
+        InputPosition.down = down;
     }
-    public synchronized void setDimensions(int w, int h) {
-        this.w = w;
-        this.h = h;
+    public static synchronized void setDimensions(int w, int h) {
+        InputPosition.w = w;
+        InputPosition.h = h;
     }
 }
 
 class Audio extends Thread {
     private AudioTrack at;
     private int buf_size; // in bytes!
-    private InputPosition inp;
     private static final int samplerate = 44100;
 
-    public Audio(InputPosition inp) {
+    public Audio() {
         super();
-        this.inp = inp;
 
         buf_size = AudioTrack.getMinBufferSize(samplerate,
                 AudioFormat.CHANNEL_CONFIGURATION_STEREO,
@@ -241,8 +241,8 @@ class Audio extends Thread {
         short[] buf = new short[buf_size];
         at.play();
         for (;;) {
-            inputXY(inp.getXScaled(), inp.getYScaled());
-            inputDown(inp.isDown());
+            inputXY(InputPosition.getXScaled(), InputPosition.getYScaled());
+            inputDown(InputPosition.isDown());
             produceStream(buf, 256);
             at.write(buf, 0, 512);
 
@@ -259,18 +259,14 @@ class Audio extends Thread {
 
 
 class XYView extends SurfaceView implements SurfaceHolder.Callback {
-    private InputPosition inp;
-
-    public XYView(Context context, InputPosition inp) {
+    public XYView(Context context) {
         super(context);
-        this.inp = inp;
         getHolder().addCallback(this);
     }
 
     @Override
     public boolean onTouchEvent(final MotionEvent ev) {
-        inp.setXY(ev.getX(), ev.getY());
-        inp.setDown(ev.getAction() != MotionEvent.ACTION_UP);
+        InputPosition.setXYD(ev.getX(), ev.getY(), ev.getAction() != MotionEvent.ACTION_UP);
         return true;
     }
 
@@ -278,7 +274,7 @@ class XYView extends SurfaceView implements SurfaceHolder.Callback {
     public void surfaceCreated(SurfaceHolder sh) {}
     public void surfaceDestroyed(SurfaceHolder sh) {}
     public void surfaceChanged(SurfaceHolder sh, int fmt, int w, int h)	{
-        inp.setDimensions(w, h);
+        InputPosition.setDimensions(w, h);
     }
 
 }
