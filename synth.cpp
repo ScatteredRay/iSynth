@@ -472,7 +472,7 @@ class StereoModule : public Module
 
     const float *output(float last_fill, int samples, int at_rate)
     {
-      if(at_rate != g_sample_rate) throw "Ugh";
+      if(at_rate != g_sample_rate) ;//throw "Ugh";
       if(m_last_fill < last_fill)
       {
         fill(last_fill, samples);
@@ -854,7 +854,7 @@ void synthSetScale(const char *name)
   for(int note=0; note<128; note++)
   {
     int closest = -128;
-    int step = 0;
+    int step = -1;
     for(int trying=0; trying<128; trying+=steps[step])
     {
       if(steps[++step] == 0) step = 0;
