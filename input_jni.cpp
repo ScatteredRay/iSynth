@@ -61,6 +61,11 @@ void readInputAxis(int axis, float *buffer, int size) {
         buffer[i] = src;
 }
 
+string getPatchLocation(const char* patchname)
+{
+    return string("patches/") + patchname + string(".pat");
+}
+
 extern "C" {
 
 JNIEXPORT void JNICALL
@@ -78,11 +83,10 @@ Java_com_iSynth_Audio_inputDown(JNIEnv *env, jobject obj, jboolean d)
 
 JNIEXPORT void JNICALL
 Java_com_iSynth_iSynth_setPatch(JNIEnv *env, jobject obj, jstring patch) {
-    static string currentpatch="";
     const char *cstr = env->GetStringUTFChars(patch, NULL);
 
-    currentpatch = cstr;
-    synthSetPatch(currentpatch);
+    // assumes synth.cpp won't use this string after synthSetPatch retunrs
+    synthSetPatch(cstr);
 
     env->ReleaseStringUTFChars(patch, NULL);
 }
