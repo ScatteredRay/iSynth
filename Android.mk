@@ -16,19 +16,11 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-STLPORT_BASE	:= $(NDK_WRAPPERS_BASE)/stlport
-
 LOCAL_MODULE    := iSynth
-LOCAL_CFLAGS	+= -I$(STLPORT_BASE)/stlport \
-		   -D__NEW__ \
-		   -D__SGI_STL_INTERNAL_PAIR_H \
-		   -DANDROID \
-		   -DOS_ANDROID \
-		   -O2
-LOCAL_LDLIBS	+= -L$(STLPORT_BASE)/build/lib/obj/arm-linux-gcc/so \
-		   -lstlport \
-		   -llog \
-		   -lgcc
-LOCAL_SRC_FILES := input_jni.cpp audio_jni.cpp file_jni.cpp synth.cpp
+LOCAL_LDLIBS += -llog
+LOCAL_SRC_FILES := input_jni.cpp \
+                   audio_jni.cpp \
+                   file_jni.cpp \
+                   synth.cpp
 
 include $(BUILD_SHARED_LIBRARY)
