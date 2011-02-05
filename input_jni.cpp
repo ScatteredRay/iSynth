@@ -63,7 +63,7 @@ void readInputAxis(int axis, float *buffer, int size) {
 
 string getPatchLocation(const char* patchname)
 {
-    return string("patches/") + patchname + string(".pat");
+    return string("patches/") + patchname + ".pat";
 }
 
 extern "C" {
@@ -85,7 +85,7 @@ JNIEXPORT void JNICALL
 Java_com_iSynth_iSynth_setPatch(JNIEnv *env, jobject obj, jstring patch) {
     const char *cstr = env->GetStringUTFChars(patch, NULL);
 
-    // assumes synth.cpp won't use this string after synthSetPatch retunrs
+    // assumes synth.cpp won't use this string after synthSetPatch returns
     synthSetPatch(cstr);
 
     env->ReleaseStringUTFChars(patch, NULL);

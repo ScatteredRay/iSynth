@@ -99,7 +99,7 @@ public class iSynth extends Activity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getGroupId()) {
         case PATCH_GID:
-            setPatch(item.getTitle()+".pat");
+            setPatch(item.getTitle().toString());
             return true;
         case SCALE_GID:
             setScale(item.getTitle().toString().toLowerCase());
