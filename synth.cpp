@@ -478,7 +478,9 @@ class StereoModule : public Module
         fill(last_fill, samples);
         m_last_fill = last_fill;
         if(m_waveout) m_waveout->writeBuffer(m_output, samples*2);
+#ifndef NDEBUG
         validateOutputRange(m_output, samples*2);
+#endif
       }
 
       return m_output;
@@ -662,6 +664,7 @@ map<string, ModuleInfo *> g_module_infos;
 
 EXCEPTION_D(ModuleExcept, Exception, "Module exception")
 
+#include "tables.cpp"
 #include "modules_generated.cpp"
 
 map<string, Module *> g_modules;
@@ -876,6 +879,8 @@ Module *setupStream()
   g_module_infos["Input"]->addParameter("axis", "int");
   
   populateLogList(g_log_list);
+
+  table_init();
 
   return loadPatch(g_patch);
 }

@@ -1,0 +1,11 @@
+200 Input x(0)
+200 Input y(1)
+200 Input touch(2)
+200 XToFrequency note_freq(x)
+200 EnvelopeGenerator env(touch, .1, .1, .6, .1)
+Rescaler pw(y, .5, .95)
+SlewLimiter pwslew(pw, .5, .5)
+Pulse pulse(note_freq, pwslew, touch)
+Multiply enved(pulse, env)
+Pan output(enved, .5)
+

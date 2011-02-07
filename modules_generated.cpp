@@ -57,6 +57,64 @@ class Saw : public Module
 };
 
 
+class BLSaw : public Module
+{
+  public:
+    BLSaw(vector<ModuleParam *> parameters)
+    {
+      m_frequency = parameters[0]->m_module;
+      m_retrigger = parameters[1]->m_module;
+      m_position = 0;
+      m_last_trigger = 0;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new BLSaw(parameters);
+    }
+
+    const char *moduleName() { return "BLSaw"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *retrigger = m_retrigger->output(last_fill, samples, m_sample_rate);
+
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
+      {
+        int row=table_row(frequency[i]);
+        *output++ = saw_table[row][(int)(m_position*TABLE_SIZE)];
+        m_position += frequency[i] / m_sample_rate;
+        m_position -= int(m_position);
+        if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
+          m_position = 0;
+        m_last_trigger = retrigger[i];
+      }
+      g_profiler.addTime("BLSaw", hires_time()-time);
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      *out_min = -1;
+      *out_max =  1;
+    }
+
+    void validateInputRange()
+    {
+      validateWithin(*m_frequency, 0, 22050);
+    }
+  private:
+    Module *m_frequency;
+    Module *m_retrigger;
+    float m_position;
+    float m_last_trigger;
+};
+
+
 class Pulse : public Module
 {
   public:
@@ -96,6 +154,68 @@ class Pulse : public Module
         m_last_trigger = retrigger[i];
       }
       g_profiler.addTime("Pulse", hires_time()-time);
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      *out_min = -1;
+      *out_max =  1;
+    }
+
+    void validateInputRange()
+    {
+      validateWithin(*m_frequency, 0, 22050);
+    }
+  private:
+    Module *m_frequency;
+    Module *m_pulsewidth;
+    Module *m_retrigger;
+    float m_position;
+    float m_last_trigger;
+};
+
+
+class BLPulse : public Module
+{
+  public:
+    BLPulse(vector<ModuleParam *> parameters)
+    {
+      m_frequency = parameters[0]->m_module;
+      m_pulsewidth = parameters[1]->m_module;
+      m_retrigger = parameters[2]->m_module;
+      m_position = 0;
+      m_last_trigger = 0;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new BLPulse(parameters);
+    }
+
+    const char *moduleName() { return "BLPulse"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *pulsewidth = m_pulsewidth->output(last_fill, samples, m_sample_rate);
+      const float *retrigger = m_retrigger->output(last_fill, samples, m_sample_rate);
+
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
+      {
+        int row=table_row(frequency[i]);
+        *output++ = saw_table[row][int(m_position*TABLE_SIZE)] -
+           saw_table[row][int((m_position+pulsewidth[i])*TABLE_SIZE) & (TABLE_SIZE-1)];
+        m_position += frequency[i] / m_sample_rate;
+        m_position -= int(m_position);
+        if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
+          m_position = 0;
+        m_last_trigger = retrigger[i];
+      }
+      g_profiler.addTime("BLPulse", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -215,6 +335,64 @@ class Triangle : public Module
         m_last_trigger = retrigger[i];
       }
       g_profiler.addTime("Triangle", hires_time()-time);
+    }
+
+    void getOutputRange(float *out_min, float *out_max)
+    {
+      *out_min = -1;
+      *out_max =  1;
+    }
+
+    void validateInputRange()
+    {
+      validateWithin(*m_frequency, 0, 22050);
+    }
+  private:
+    Module *m_frequency;
+    Module *m_retrigger;
+    float m_position;
+    float m_last_trigger;
+};
+
+
+class BLTriangle : public Module
+{
+  public:
+    BLTriangle(vector<ModuleParam *> parameters)
+    {
+      m_frequency = parameters[0]->m_module;
+      m_retrigger = parameters[1]->m_module;
+      m_position = 0;
+      m_last_trigger = 0;
+
+    }
+    static Module *create(vector<ModuleParam *> parameters)
+    {
+      return new BLTriangle(parameters);
+    }
+
+    const char *moduleName() { return "BLTriangle"; }
+
+    
+    void fill(float last_fill, int samples)
+    {
+      float *output = m_output;
+      const float *frequency = m_frequency->output(last_fill, samples, m_sample_rate);
+      const float *retrigger = m_retrigger->output(last_fill, samples, m_sample_rate);
+
+      double time = hires_time();
+      int sample_count = ::max(1.0f, samples*m_sample_rate/g_sample_rate);
+      for(int i=0; i<sample_count; i++)
+      {
+        int row = table_row(frequency[i]);
+        *output++ = tri_table[row][int(m_position*TABLE_SIZE)];
+        m_position += frequency[i] / m_sample_rate;
+        m_position -= int(m_position);
+        if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
+          m_position = 0;
+        m_last_trigger = retrigger[i];
+      }
+      g_profiler.addTime("BLTriangle", hires_time()-time);
     }
 
     void getOutputRange(float *out_min, float *out_max)
@@ -1700,10 +1878,17 @@ void fillModuleList()
   g_module_infos["Saw"] = new ModuleInfo("Saw", Saw::create);
   g_module_infos["Saw"]->addParameter("frequency", "Module");
   g_module_infos["Saw"]->addParameter("retrigger", "Module", 0);
+  g_module_infos["BLSaw"] = new ModuleInfo("BLSaw", BLSaw::create);
+  g_module_infos["BLSaw"]->addParameter("frequency", "Module");
+  g_module_infos["BLSaw"]->addParameter("retrigger", "Module", 0);
   g_module_infos["Pulse"] = new ModuleInfo("Pulse", Pulse::create);
   g_module_infos["Pulse"]->addParameter("frequency", "Module");
   g_module_infos["Pulse"]->addParameter("pulsewidth", "Module", 0.5);
   g_module_infos["Pulse"]->addParameter("retrigger", "Module", 0);
+  g_module_infos["BLPulse"] = new ModuleInfo("BLPulse", BLPulse::create);
+  g_module_infos["BLPulse"]->addParameter("frequency", "Module");
+  g_module_infos["BLPulse"]->addParameter("pulsewidth", "Module", 0.5);
+  g_module_infos["BLPulse"]->addParameter("retrigger", "Module", 0);
   g_module_infos["Sine"] = new ModuleInfo("Sine", Sine::create);
   g_module_infos["Sine"]->addParameter("frequency", "Module");
   g_module_infos["Sine"]->addParameter("retrigger", "Module", 0);
@@ -1711,6 +1896,9 @@ void fillModuleList()
   g_module_infos["Triangle"] = new ModuleInfo("Triangle", Triangle::create);
   g_module_infos["Triangle"]->addParameter("frequency", "Module");
   g_module_infos["Triangle"]->addParameter("retrigger", "Module", 0);
+  g_module_infos["BLTriangle"] = new ModuleInfo("BLTriangle", BLTriangle::create);
+  g_module_infos["BLTriangle"]->addParameter("frequency", "Module");
+  g_module_infos["BLTriangle"]->addParameter("retrigger", "Module", 0);
   g_module_infos["Noise"] = new ModuleInfo("Noise", Noise::create);
   g_module_infos["Within"] = new ModuleInfo("Within", Within::create);
   g_module_infos["Within"]->addParameter("input", "Module");
