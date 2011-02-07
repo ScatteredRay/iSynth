@@ -116,7 +116,7 @@ scale g_scales[] =
   { "4th",        "\5" },
   { "tritone",    "\6" },
   { "5th",        "\7" },
-  { "octave",     "\12" },
+  { "octave",     "\14" },
   { 0,            0 }
 };
 
@@ -845,7 +845,7 @@ void synthSetKey(int key)
 
 void synthSetScale(const char *name)
 {
-  char *steps;
+  char *steps=0;
   for(int i=0; g_scales[i].name; i++)
     if(strcmp(name, g_scales[i].name) == 0)
       steps = (char *)(g_scales[i].steps);
