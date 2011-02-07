@@ -100,6 +100,7 @@ public class iSynth extends Activity {
         switch (item.getGroupId()) {
         case PATCH_GID:
             setPatch(item.getTitle().toString());
+            setRange(2,6);
             return true;
         case SCALE_GID:
             setScale(item.getTitle().toString().toLowerCase());
@@ -166,7 +167,7 @@ public class iSynth extends Activity {
     private native void setPatch(String patch);
     private native void setScale(String scale);
     private native void setKey(int key);
-//    private native void setOctave(int octave);
+    private native void setRange(int start_octave, int octave_range);
 
 
     static {

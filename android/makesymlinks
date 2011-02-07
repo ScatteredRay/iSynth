@@ -1,0 +1,13 @@
+#!/bin/bash
+
+cd assets/patches
+for f in ../../jni/patches/*.pat; do
+  ln -s "$f" "${f##*/}.png"
+done
+
+cd ../samples
+for f in ../../jni/samples/*.wav; do
+  ln -s "$f" "${f##*/}.png"
+done
+
+

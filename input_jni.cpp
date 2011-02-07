@@ -3,11 +3,7 @@
 #include <android/log.h>
 #include "input.h"
 #include "synth.h"
-
-
-#ifdef PROFILING
 #include <sys/time.h>
-#endif
 
 using std::string;
 
@@ -27,13 +23,9 @@ void deinitInput() { }
 void populateLogList(std::vector<std::string>& log_list) { }
 
 double hires_time() {
-#ifdef PROFILING
-    timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec + tv.tv_usec/1e6;
-#else
-    return 0.0;
-#endif
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec/1e9;
 }
 
 char getKey() {
@@ -83,6 +75,8 @@ Java_com_iSynth_Audio_inputDown(JNIEnv *env, jobject obj, jboolean d)
 
 JNIEXPORT void JNICALL
 Java_com_iSynth_iSynth_setPatch(JNIEnv *env, jobject obj, jstring patch) {
+    char *time = describeTimeSpent();
+    D(time);
     const char *cstr = env->GetStringUTFChars(patch, NULL);
 
     // assumes synth.cpp won't use this string after synthSetPatch returns
@@ -103,6 +97,11 @@ Java_com_iSynth_iSynth_setScale(JNIEnv *env, jobject obj, jstring scale) {
 JNIEXPORT void JNICALL
 Java_com_iSynth_iSynth_setKey(JNIEnv *env, jobject obj, jint key) {
     synthSetKey((int)key);
+}
+
+JNIEXPORT void JNICALL
+Java_com_iSynth_iSynth_setRange(JNIEnv *env, jobject obj, jint start_octave, jint octave_range) {
+    synthSetRange((int)start_octave, (int)octave_range);
 }
 
 } //extern "C"
