@@ -56,7 +56,8 @@
   fill:
     int row=table_row(frequency[i]);
     *output++ = saw_table[row][int(m_position*TABLE_SIZE)] -
-       saw_table[row][int((m_position+pulsewidth[i])*TABLE_SIZE) & (TABLE_SIZE-1)];
+       saw_table[row][int((m_position+pulsewidth[i])*TABLE_SIZE) & (TABLE_SIZE-1)] +
+       2*pulsewidth[i]-1;
     m_position += frequency[i] / m_sample_rate;
     m_position -= int(m_position);
     if(m_last_trigger < 0.9 && retrigger[i] >= 0.9)
